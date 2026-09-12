@@ -23,6 +23,7 @@ struct BoardScreen: View {
     @State private var dragging: ItemID?
     @State private var dragLocation: CGPoint = .zero
     @State private var dropTarget: ItemID?
+    @State private var showingResetConfirmation = false
     /// The board's frame in the shared "stage" space — lets a drag that starts
     /// in the tray hit-test and land on the board with no coordinate seams.
     @State private var boardFrame: CGRect = .zero
@@ -52,6 +53,13 @@ struct BoardScreen: View {
             }
         }
         .background(Token.surface)
+        .confirmationDialog("Reset your game?", isPresented: $showingResetConfirmation, titleVisibility: .visible) {
+            Button("Reset Progress", role: .destructive) {
+                game.resetProgress()
+            }
+        } message: {
+            Text("This permanently removes every discovery and attempted combination. You’ll start again with Water, Fire, Wind, and Earth.")
+        }
     }
 
     // MARK: - Tray
@@ -178,6 +186,12 @@ struct BoardScreen: View {
                 Text("Clear board").font(.control(13.5)).foregroundStyle(Token.accent)
             }
 
+            Button(role: .destructive) {
+                showingResetConfirmation = true
+            } label: {
+                Text("Reset game").font(.control(13.5))
+            }
+
             Rectangle().fill(Token.hairline).frame(width: Token.hairlineWidth, height: 22)
 
             ForEach(game.collectionNewestFirst.prefix(2), id: \.self) { id in
@@ -270,13 +284,13 @@ struct BoardScreen: View {
                 guard game.acceptsInput else { return }
                 dragging = id
                 dragLocation = value.location
-                dropTarget = hitTest(toBoard(value.location), excluding: id)
+                dropTarget = hitTest(toBoard(value.location), preferringOtherThan: id)
             }
             .onEnded { value in
                 defer { dragging = nil; dropTarget = nil }
                 guard game.acceptsInput else { return }
                 let point = toBoard(value.location)
-                if let target = hitTest(point, excluding: id) {
+                if let target = hitTest(point, preferringOtherThan: id) {
                     game.combine(target, id)
                 } else if boardFrame.contains(value.location) {
                     // Drop on empty board space parks the item there.
@@ -293,18 +307,20 @@ struct BoardScreen: View {
     }
 
     /// Hit-testing is generous — target radius exceeds the pill's bounds by ~12pt.
-    private func hitTest(_ point: CGPoint, excluding id: ItemID) -> ItemID? {
+    /// Other pills take precedence, but the dragged pill remains a valid
+    /// fallback target so an item can be combined with itself.
+    private func hitTest(_ point: CGPoint, preferringOtherThan id: ItemID) -> ItemID? {
         let slop: CGFloat = 12
-        return game.boardItems.first { entry in
-            guard entry.key != id else { return false }
+        let matches = game.boardItems.compactMap { entry -> ItemID? in
             let frame = CGRect(
                 x: entry.value.x - 70 - slop,
                 y: entry.value.y - pillSize.height / 2 - slop,
                 width: 140 + slop * 2,
                 height: pillSize.height + slop * 2
             )
-            return frame.contains(point)
-        }?.key
+            return frame.contains(point) ? entry.key : nil
+        }
+        return matches.first(where: { $0 != id }) ?? matches.first(where: { $0 == id })
     }
 
     @ViewBuilder

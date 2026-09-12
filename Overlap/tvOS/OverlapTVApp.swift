@@ -16,6 +16,7 @@ struct OverlapTVApp: App {
 struct TVCombineScreen: View {
     let game: GameState
     @State private var animator = CombineAnimator()
+    @State private var showingResetConfirmation = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -49,6 +50,13 @@ struct TVCombineScreen: View {
             }
         }
         .animation(Token.revealCurve, value: game.phase)
+        .confirmationDialog("Reset your game?", isPresented: $showingResetConfirmation, titleVisibility: .visible) {
+            Button("Reset Progress", role: .destructive) {
+                game.resetProgress()
+            }
+        } message: {
+            Text("This permanently removes every discovery and attempted combination. You’ll start again with Water, Fire, Wind, and Earth.")
+        }
     }
 
     private var header: some View {
@@ -64,6 +72,11 @@ struct TVCombineScreen: View {
                     .foregroundStyle(Color(red: 235/255, green: 235/255, blue: 245/255, opacity: 0.55))
             }
             Spacer()
+            Button("Reset game") {
+                showingResetConfirmation = true
+            }
+            .buttonStyle(.bordered)
+            .tint(.red)
             Text(statusText)
                 .font(.mono(17))
                 .tracking(17 * 0.14)

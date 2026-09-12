@@ -371,6 +371,22 @@ final class GameState {
         persist()
     }
 
+    /// Erases local progress and restores the four starter elements.
+    func resetProgress() {
+        resolveTask?.cancel(); resolveTask = nil
+        timerTask?.cancel(); timerTask = nil
+        slotA = nil
+        slotB = nil
+        phase = .idle
+        resetToBase()
+        aiElements.removeAll()
+        aiCombos.removeAll()
+        undoStack.removeAll()
+        dictionaryDidChange = false
+        invalidateDerived()
+        persist()
+    }
+
     // MARK: - Undo
 
     /// One step of undo for the last combine, as specced for ⌘Z.

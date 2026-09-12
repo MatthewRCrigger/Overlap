@@ -6,12 +6,15 @@ struct CombineScreen: View {
     @Bindable var game: GameState
     @Environment(\.colorScheme) private var scheme
     @State private var animator = CombineAnimator()
+    @State private var showingResetConfirmation = false
 
     var body: some View {
         VStack(spacing: 0) {
             header
             stage
-            CollectionShelf(game: game)
+            CollectionShelf(game: game) {
+                showingResetConfirmation = true
+            }
         }
         .background(Token.surface)
         .overlay(alignment: .center) { deadEndToast }
@@ -23,6 +26,13 @@ struct CombineScreen: View {
             } else if case .idle = phase {
                 animator.reset()
             }
+        }
+        .confirmationDialog("Reset your game?", isPresented: $showingResetConfirmation, titleVisibility: .visible) {
+            Button("Reset Progress", role: .destructive) {
+                game.resetProgress()
+            }
+        } message: {
+            Text("This permanently removes every discovery and attempted combination. You’ll start again with Water, Fire, Wind, and Earth.")
         }
     }
 
@@ -144,6 +154,7 @@ struct GlassCircleButton: View {
 /// them) and lists later discoveries newest-first behind them.
 struct CollectionShelf: View {
     let game: GameState
+    let onReset: () -> Void
 
     private let columns = [GridItem(.adaptive(minimum: 96, maximum: 220), spacing: 8)]
 
@@ -152,6 +163,11 @@ struct CollectionShelf: View {
             HStack {
                 Text("Your collection").monoMeta(10)
                 Spacer()
+                Button("Reset") {
+                    onReset()
+                }
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.red)
                 Text("Starters first").monoMeta(10)
             }
             ScrollView {
@@ -169,8 +185,9 @@ struct CollectionShelf: View {
                             )
                         }
                         .buttonStyle(.plain)
-                        // A pill loaded into a circle renders held and rejects input.
-                        .disabled(isHeld || !game.acceptsInput)
+                        // A held pill may be selected again for a self-pair
+                        // (for example, Fire + Fire).
+                        .disabled(!game.acceptsInput)
                     }
                 }
             }
