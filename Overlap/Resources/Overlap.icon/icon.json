@@ -1,0 +1,28 @@
+{
+  "fill": {
+    "solid": "extended-srgb:1.00000,1.00000,1.00000,1.00000"
+  },
+  "groups": [
+    {
+      "layers": [
+        {
+          "image-name": "mark.png",
+          "name": "mark",
+          "blend-mode": "normal",
+          "glass": false
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.35
+      },
+      "translucency": {
+        "enabled": false,
+        "value": 0.5
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": "shared"
+  }
+}

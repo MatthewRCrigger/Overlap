@@ -1,0 +1,27 @@
+# Xcode build products and per-user state
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+
+# macOS metadata
+.DS_Store
+
+# Local secrets (the Worker secret is stored in Cloudflare, never here)
+.env
+.env.*
+!.env.example
+Config/ServiceEndpoint.local.xcconfig
+
+# Python tooling output
+__pycache__/
+
+# Recipe curation scratch files
+combos.json.bak
+combos.json.pre-*
+
+# Agent and editor tooling
+.claude/
+.codex/
