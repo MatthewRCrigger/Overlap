@@ -434,7 +434,7 @@ final class GameState {
     }
 
     func result(_ a: ItemID, _ b: ItemID) -> ItemID? {
-        engine.result(a, b) ?? aiCombos[PairKey(a, b)]
+        aiCombos[PairKey(a, b)]
     }
 
     func owns(_ id: ItemID) -> Bool { collectionSet.contains(id) }
