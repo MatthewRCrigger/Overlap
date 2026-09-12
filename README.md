@@ -1,15 +1,15 @@
 # Overlap
 
-Overlap is a playful SwiftUI element-combining game for iPhone, iPad, Mac, and Apple TV. Start with four familiar elements, discover recipes from the bundled map, and make new combinations as you play.
+Overlap is a playful SwiftUI element-combining game for iPhone, iPad, Mac, and Apple TV. Start with four familiar elements, discover recipes from a shared online cache, and make new combinations as you play.
 
-Most combinations are bundled with the app. When a pair is not in that map, the app can ask a small Cloudflare Worker for a family-friendly result. The Worker owns the OpenAI credential; the app never includes it.
+The app sends a pair to a small Cloudflare Worker. The Worker reads the shared D1 recipe cache first; on a miss it asks OpenAI for a family-friendly result, stores it in D1, and returns it. The Worker owns the OpenAI credential; the app never includes it.
 
 ## What is in this repository
 
 - `Overlap/` — shared SwiftUI game code plus platform entry points and app resources.
 - `Overlap.xcodeproj/` — generated Xcode project. Edit `project.yml`, then regenerate it with XcodeGen.
-- `worker/` — the Cloudflare Worker used only for missing combinations.
-- `combos.json` — the source combination map.
+- `worker/` — the Cloudflare Worker, D1 migration, and seed script.
+- `combos.json` — the original recipe data; the app does not bundle this file.
 - `docs/` — supporting material.
 
 ## Run the macOS app
@@ -33,9 +33,13 @@ Prerequisites: Node.js 20+ and a Cloudflare account with Workers access.
 cd worker
 npm ci
 npx wrangler login
+npx wrangler d1 create overlap-recipes
 npx wrangler secret put OPENAI_API_KEY
+npx wrangler d1 migrations apply overlap-recipes --remote
 npm run deploy
 ```
+
+After creating a D1 database, replace `database_id` in `worker/wrangler.jsonc` with the ID Wrangler prints. To preload this repository's original recipes into D1, run `npm run seed:sql`, then execute the generated `/private/tmp/overlap-recipes-seed.sql` with `wrangler d1 execute <your-database-name> --remote --file=...`. New recipes are then added automatically on global cache misses.
 
 The Worker exposes:
 
@@ -54,11 +58,11 @@ cp Config/ServiceEndpoint.local.xcconfig.example Config/ServiceEndpoint.local.xc
 xcodegen generate
 ```
 
-`Config/ServiceEndpoint.local.xcconfig` is ignored by Git. Its `COMBO_FALLBACK_ENDPOINT` value becomes the app’s `ComboFallbackEndpoint` Info.plist value for every platform target. It must be an HTTPS URL ending in the Worker route. In an `.xcconfig` value, write an HTTPS URL as `https:/$()/your-worker.your-account.workers.dev/v1/combine` because `//` starts a comment. Without that local file—or with an empty or invalid value—the online fallback is disabled and bundled plus locally cached recipes continue to work.
+`Config/ServiceEndpoint.local.xcconfig` is ignored by Git. Its `COMBO_FALLBACK_ENDPOINT` value becomes the app’s `ComboFallbackEndpoint` Info.plist value for every platform target. It must be an HTTPS URL ending in the Worker route. In an `.xcconfig` value, write an HTTPS URL as `https:/$()/your-worker.your-account.workers.dev/v1/combine` because `//` starts a comment. Without that local file—or with an empty or invalid value—the app cannot resolve new combinations.
 
 ## Privacy and network behavior
 
-The app uses the bundled map first and caches generated results in the player’s local save. A network request is made only when a player combines a pair absent from both the bundled map and that local cache. That request contains only the two element names; no account or player data is sent.
+The app retains discovered recipes in the player’s local save, but the Worker is the source of truth. Each request contains only the two element names; no account or player data is sent. The Worker checks D1 first, so an OpenAI request is made only for a globally unseen pair.
 
 ## Development notes
 

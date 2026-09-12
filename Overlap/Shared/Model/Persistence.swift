@@ -8,8 +8,8 @@ struct SaveFile: Codable {
     var tried: [String] = []           // combo keys
     var board: [String: BoardPoint] = [:]  // iPad/Mac parked positions
     var dataVersion: String = ""
-    /// Results created by the online fallback. The dictionary remains the
-    /// source of truth for authored recipes; these are per-device additions.
+    /// Locally retained metadata for recipes already returned by the shared
+    /// service. This keeps a player's past discoveries readable offline.
     var aiElements: [String: AIElement]?
     var aiCombos: [String: String]?
 

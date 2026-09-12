@@ -6,6 +6,14 @@
   "secrets": {
     "required": ["OPENAI_API_KEY"]
   },
+  "d1_databases": [
+    {
+      "binding": "RECIPES_DB",
+      "database_name": "overlap-recipes",
+      "database_id": "1a78adee-f34f-4748-aeb9-37d5179da38a",
+      "migrations_dir": "migrations"
+    }
+  ],
   "observability": {
     "enabled": true,
     "logs": {

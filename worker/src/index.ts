@@ -5,6 +5,11 @@ const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
 type CombineRequest = { left?: unknown; right?: unknown };
 type Combination = { name: string; emoji: string };
 type OpenAIResponse = { output_text?: unknown; output?: unknown };
+type RecipeRow = {
+  result_name: string;
+  emoji: string;
+  source: "seed" | "ai";
+};
 
 const combinationSchema = {
   type: "object",
@@ -27,6 +32,14 @@ function normalizeItem(value: unknown): string | null {
     return null;
   }
   return normalized;
+}
+
+function itemKey(value: string): string {
+  return value.normalize("NFC").toLowerCase();
+}
+
+function pairKey(left: string, right: string): string {
+  return [itemKey(left), itemKey(right)].sort().join("+");
 }
 
 async function readSmallJSON(request: Request): Promise<CombineRequest | null> {
@@ -160,6 +173,27 @@ async function generateCombination(left: string, right: string, apiKey: string):
   }
 }
 
+async function findRecipe(db: D1Database, key: string): Promise<RecipeRow | null> {
+  return db
+    .prepare("SELECT result_name, emoji, source FROM recipes WHERE pair_key = ? AND state = 'active' LIMIT 1")
+    .bind(key)
+    .first<RecipeRow>();
+}
+
+async function saveRecipe(
+  db: D1Database,
+  key: string,
+  combination: Combination,
+): Promise<RecipeRow | null> {
+  await db
+    .prepare(
+      "INSERT OR IGNORE INTO recipes (pair_key, result_key, result_name, emoji, source) VALUES (?, ?, ?, ?, 'ai')",
+    )
+    .bind(key, itemKey(combination.name), combination.name, combination.emoji)
+    .run();
+  return findRecipe(db, key);
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -180,12 +214,31 @@ export default {
       return json({ error: "left and right must be short, non-empty item names" }, 400);
     }
 
+    const key = pairKey(left, right);
+    try {
+      const cached = await findRecipe(env.RECIPES_DB, key);
+      if (cached) {
+        console.log(JSON.stringify({ message: "Combination cache hit", source: cached.source }));
+        return json({ name: cached.result_name, emoji: cached.emoji, source: cached.source });
+      }
+    } catch (error) {
+      console.error(JSON.stringify({ message: "D1 lookup failed", error: String(error) }));
+      return json({ error: "Combination cache is unavailable" }, 503);
+    }
+
     const generated = await generateCombination(left, right, env.OPENAI_API_KEY);
     if (!generated.combination) {
       return json({ error: "Combination generation is unavailable", upstreamStatus: generated.upstreamStatus }, 502);
     }
 
-    console.log(JSON.stringify({ message: "Combination generated" }));
-    return json({ ...generated.combination, source: "ai" });
+    try {
+      const saved = await saveRecipe(env.RECIPES_DB, key, generated.combination);
+      if (!saved) return json({ error: "Combination cache is unavailable" }, 503);
+      console.log(JSON.stringify({ message: "Combination generated and cached" }));
+      return json({ name: saved.result_name, emoji: saved.emoji, source: saved.source });
+    } catch (error) {
+      console.error(JSON.stringify({ message: "D1 write failed", error: String(error) }));
+      return json({ error: "Combination cache is unavailable" }, 503);
+    }
   },
 } satisfies ExportedHandler<Env>;

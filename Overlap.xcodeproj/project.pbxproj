@@ -8,7 +8,6 @@
 
 /* Begin PBXBuildFile section */
 		00590DD60D12A34A39F3280E /* BoardScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7FA8C2C9610C971F60ABA11 /* BoardScreen.swift */; };
-		032163B6D78AD9687686B58C /* combos.json in Resources */ = {isa = PBXBuildFile; fileRef = 499F5AD5143815FCB116DA0D /* combos.json */; };
 		033BFE25D68355A17C1C4E51 /* ChainsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1486BCB2807C54360AD9B88A /* ChainsScreen.swift */; };
 		07ACF163DDAD694795EEE09C /* Tokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A09F4DD64B52919EA312B38 /* Tokens.swift */; };
 		07D130560580DDA28D15824E /* VennStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A08CC617C109974B77432F0 /* VennStage.swift */; };
@@ -16,7 +15,6 @@
 		0BCA4938C45050790702C400 /* AppRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B3B38484144F34BF89CE191 /* AppRoot.swift */; };
 		105948F0AB6625B787AD62F1 /* Persistence.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FC79C37E80C07DA4F8040E /* Persistence.swift */; };
 		118FB3A1031F72EE951297BA /* ComboFallbackClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = C51E64A6C429428E8E62D4CA /* ComboFallbackClient.swift */; };
-		1A6F4DE3C66A4A3EC2533FF3 /* combos.json in Resources */ = {isa = PBXBuildFile; fileRef = 499F5AD5143815FCB116DA0D /* combos.json */; };
 		1CECADE00004C8F4F60EF73F /* GameState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12E1CAB96E00913B0FB69EAA /* GameState.swift */; };
 		276F9BF2E9A615204E8AFAC6 /* ChainsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1486BCB2807C54360AD9B88A /* ChainsScreen.swift */; };
 		2C221BEE11632532020365C8 /* CollectionScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AD122692C642E2B0A6D22DB /* CollectionScreen.swift */; };
@@ -24,7 +22,6 @@
 		3F3DCDDE995920FA9CD6899E /* AppRoot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B3B38484144F34BF89CE191 /* AppRoot.swift */; };
 		440EF4461C19B7BF27B0E83B /* OverlapTVApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E42EA12D9E4CB0A614D68709 /* OverlapTVApp.swift */; };
 		4AC04C27788FCBBA37CDB72A /* LogoMark.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD321FDE995CBBA7E13A975F /* LogoMark.swift */; };
-		4DC8AD19DA65E2F4E6915AA5 /* combos.json in Resources */ = {isa = PBXBuildFile; fileRef = 499F5AD5143815FCB116DA0D /* combos.json */; };
 		4EE612589A485892BDF815AC /* OverlapApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD4D58882B70A5C1A230C96D /* OverlapApp.swift */; };
 		4F7AD54CA750D344DA7830E3 /* Overlap.icon in Resources */ = {isa = PBXBuildFile; fileRef = 2D6855976BB1B2C1EC2EC73B /* Overlap.icon */; };
 		57CB89EE17E9E48C3961F62F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3B8E9E6A881AB6A85DAB0E52 /* Assets.xcassets */; };
@@ -73,7 +70,6 @@
 		2D6855976BB1B2C1EC2EC73B /* Overlap.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = Overlap.icon; sourceTree = "<group>"; };
 		3B8E9E6A881AB6A85DAB0E52 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		3E06D112F7DA3DA73EBF6F15 /* ComboEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComboEngine.swift; sourceTree = "<group>"; };
-		499F5AD5143815FCB116DA0D /* combos.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = combos.json; sourceTree = "<group>"; };
 		532F5043B735F95C0D898525 /* Overlap-macOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Overlap-macOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		8A09F4DD64B52919EA312B38 /* Tokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tokens.swift; sourceTree = "<group>"; };
 		AA2F874633394C9BD9D69AE4 /* OverlapMacApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlapMacApp.swift; sourceTree = "<group>"; };
@@ -170,7 +166,6 @@
 			isa = PBXGroup;
 			children = (
 				3B8E9E6A881AB6A85DAB0E52 /* Assets.xcassets */,
-				499F5AD5143815FCB116DA0D /* combos.json */,
 				2D6855976BB1B2C1EC2EC73B /* Overlap.icon */,
 				E5B545C6D4C6FD8582614E7A /* tvOS.xcassets */,
 			);
@@ -314,7 +309,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				1A6F4DE3C66A4A3EC2533FF3 /* combos.json in Resources */,
 				E568B95DD941692C5CADDD4A /* tvOS.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -325,7 +319,6 @@
 			files = (
 				57CB89EE17E9E48C3961F62F /* Assets.xcassets in Resources */,
 				093FD2EECDA6210DE721A139 /* Overlap.icon in Resources */,
-				032163B6D78AD9687686B58C /* combos.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -335,7 +328,6 @@
 			files = (
 				989817DED57F218AEA27AAD0 /* Assets.xcassets in Resources */,
 				4F7AD54CA750D344DA7830E3 /* Overlap.icon in Resources */,
-				4DC8AD19DA65E2F4E6915AA5 /* combos.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

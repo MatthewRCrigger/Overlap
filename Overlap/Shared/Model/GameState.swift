@@ -40,7 +40,7 @@ struct Reveal: Equatable {
 }
 
 /// Duration of `working → reveal`. The anticipation beat, not latency cover —
-/// the lookup is a dictionary hit.
+/// the cache lookup is usually fast.
 let combineDelay: Duration = .milliseconds(650)
 /// Dead-end toast dwell.
 let deadEndDwell: Duration = .milliseconds(1900)
@@ -66,7 +66,7 @@ final class DerivedCache {
         chains = nil
         totalLeads = nil
         looseEnds = nil
-        // Depths come from immutable dictionary data, so they stay valid.
+        depths.removeAll(keepingCapacity: true)
     }
 }
 
@@ -86,7 +86,9 @@ final class GameState {
     private(set) var collectionSet: Set<ItemID> = []
     /// Every pair attempted, hits and misses. A miss still consumes the lead.
     private(set) var tried: Set<PairKey> = []
-    /// Per-device recipes returned by the Worker. Bundled content always wins.
+    /// Per-device recipe metadata returned by the shared recipe service. The
+    /// service is the global source of truth; this cache keeps saved discoveries
+    /// readable offline after they have been made.
     private var aiElements: [ItemID: AIElement] = [:]
     private var aiCombos: [PairKey: ItemID] = [:]
 
@@ -104,7 +106,7 @@ final class GameState {
     /// Auto-clear timers (dead-end dwell, reveal failsafe). Kept separate so
     /// starting one can never cancel the resolve that started it.
     private var timerTask: Task<Void, Never>?
-    /// Set when the loaded save was written against a different dictionary.
+    /// Set when the loaded save predates the remote-recipe data model.
     private(set) var dictionaryDidChange = false
 
     // MARK: - Lifecycle
@@ -134,16 +136,21 @@ final class GameState {
             out[PairKey(rawKey: entry.key)] = ItemID(entry.value)
         }
 
-        // Drop names the dictionary no longer knows — a rename orphans them.
-        let known = save.collection.map(ItemID.init).filter {
-            engine.element($0) != nil || aiElements[$0] != nil
+        // Saves created before the remote data model stored bundled discovery
+        // names without metadata. Preserve them rather than dropping a
+        // player's collection; a later recipe response replaces the ◇ marker.
+        for name in save.collection {
+            let id = ItemID(name)
+            if engine.element(id) == nil, aiElements[id] == nil {
+                aiElements[id] = AIElement(name: name, emoji: "◇")
+            }
         }
-        collection = known
-        collectionSet = Set(known)
+        collection = save.collection.map(ItemID.init)
+        collectionSet = Set(collection)
         tried = Set(save.tried.map(PairKey.init(rawKey:)))
         boardItems = save.board.reduce(into: [:]) { out, entry in
             let id = ItemID(entry.key)
-            if engine.element(id) != nil || aiElements[id] != nil { out[id] = entry.value.cgPoint }
+            if collectionSet.contains(id) { out[id] = entry.value.cgPoint }
         }
 
         // Base items are always owned, even if a save predates one of them.
@@ -416,8 +423,8 @@ final class GameState {
         return base + rest
     }
 
-    /// Resolves display data from the bundled dictionary first, then from the
-    /// saved AI fallback catalog.
+    /// Resolves display data from the starting elements first, then from the
+    /// locally retained discovery catalog.
     func name(of id: ItemID) -> String {
         engine.element(id)?.name ?? aiElements[id]?.name ?? id.key
     }
@@ -437,8 +444,8 @@ final class GameState {
     /// where something remains without saying what.
     func untriedLeadCount(for id: ItemID) -> Int {
         if let cached = cache.leads[id] { return cached }
-        let count = engine.recipes(involving: id).count { pair in
-            !tried.contains(pair) && engine.inputs(of: pair).allSatisfy(collectionSet.contains)
+        let count = collection.reduce(into: 0) { total, other in
+            if !tried.contains(PairKey(id, other)) { total += 1 }
         }
         cache.leads[id] = count
         return count
@@ -447,32 +454,48 @@ final class GameState {
     /// Total untried leads across the collection. Each pair counted once.
     var totalUntriedLeads: Int {
         if let cached = cache.totalLeads { return cached }
-        var seen: Set<PairKey> = []
-        for id in collection {
-            for pair in engine.recipes(involving: id) where !tried.contains(pair) {
-                if engine.inputs(of: pair).allSatisfy(collectionSet.contains) {
-                    seen.insert(pair)
-                }
+        var count = 0
+        for (index, id) in collection.enumerated() {
+            for other in collection[index...] where !tried.contains(PairKey(id, other)) {
+                count += 1
             }
         }
-        cache.totalLeads = seen.count
-        return seen.count
+        cache.totalLeads = count
+        return count
     }
 
-    /// An owned item with no untried lead left. Large by design — the dictionary
-    /// was sampled, so many elements only ever appear as a result.
+    /// An owned item with no untried pair left in the current collection.
     func isDeadEnd(_ id: ItemID) -> Bool {
         untriedLeadCount(for: id) == 0
     }
 
     var deadEnds: [ItemID] { collection.filter(isDeadEnd) }
 
-    func depth(of id: ItemID) -> Int? { engine.depth(of: id, cache: &cache.depths) }
+    func depth(of id: ItemID) -> Int? {
+        func resolve(_ current: ItemID, visiting: Set<ItemID>) -> Int? {
+            if let cached = cache.depths[current] { return cached }
+            if engine.element(current)?.isBase == true {
+                cache.depths[current] = 0
+                return 0
+            }
+            guard !visiting.contains(current), let (a, b) = recipe(for: current),
+                  let depthA = resolve(a, visiting: visiting.union([current])),
+                  let depthB = resolve(b, visiting: visiting.union([current])) else {
+                return nil
+            }
+            let resolved = max(depthA, depthB) + 1
+            cache.depths[current] = resolved
+            return resolved
+        }
+        return resolve(id, visiting: [])
+    }
 
     /// The two items that first produced this one, when known.
     func recipe(for id: ItemID) -> (ItemID, ItemID)? {
-        guard let parents = engine.element(id)?.parents, parents.count == 2 else { return nil }
-        return (parents[0], parents[1])
+        guard let pair = aiCombos.first(where: { $0.value == id })?.key else { return nil }
+        let inputs = ComboEngine.parseInputs(of: pair)
+        guard inputs.count == 2 else { return nil }
+        return (inputs[0], inputs[1])
     }
 
     // MARK: - Chains
@@ -489,12 +512,13 @@ final class GameState {
         // Terminals: owned, non-base, with no owned descendant.
         var hasOwnedDescendant: Set<ItemID> = []
         for id in collection {
-            for parent in engine.element(id)?.parents ?? [] {
-                hasOwnedDescendant.insert(parent)
+            if let (a, b) = recipe(for: id) {
+                hasOwnedDescendant.insert(a)
+                hasOwnedDescendant.insert(b)
             }
         }
         let terminals = collection.filter {
-            !(engine.element($0)?.isBase ?? false) && !hasOwnedDescendant.contains($0)
+            engine.element($0)?.isBase != true && !hasOwnedDescendant.contains($0)
         }
 
         return terminals.compactMap { terminal in
@@ -515,9 +539,7 @@ final class GameState {
         var reachCount: [ItemID: Int] = [:]
 
         while let current = queue.popLast() {
-            guard let element = engine.element(current),
-                  let parents = element.parents, parents.count == 2 else { continue }
-            let a = parents[0], b = parents[1]
+            guard let (a, b) = recipe(for: current) else { continue }
             steps[current] = ChainStep(
                 a: a, b: b, result: current,
                 depth: depth(of: current) ?? 0

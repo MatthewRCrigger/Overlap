@@ -7,7 +7,8 @@
     "check": "wrangler check",
     "deploy:dry-run": "wrangler deploy --dry-run",
     "deploy": "wrangler deploy",
-    "types": "wrangler types"
+    "types": "wrangler types",
+    "seed:sql": "node scripts/seed-recipes.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.43.0"

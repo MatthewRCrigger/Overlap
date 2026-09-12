@@ -1,3 +1,3 @@
-// Online fallback is disabled unless a developer provides the local override.
+// The shared recipe service is disabled unless a developer provides the local override.
 COMBO_FALLBACK_ENDPOINT =
 #include? "ServiceEndpoint.local.xcconfig"

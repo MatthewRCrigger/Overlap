@@ -33,7 +33,6 @@ targets:
     sources:
       - path: Overlap/Shared
       - path: Overlap/iOS
-      - path: Overlap/Resources/combos.json
       - path: Overlap/Resources/Overlap.icon
       - path: Overlap/Resources/Assets.xcassets
     settings:
@@ -60,7 +59,6 @@ targets:
     sources:
       - path: Overlap/Shared
       - path: Overlap/macOS
-      - path: Overlap/Resources/combos.json
       - path: Overlap/Resources/Overlap.icon
       - path: Overlap/Resources/Assets.xcassets
     settings:
@@ -85,7 +83,6 @@ targets:
     sources:
       - path: Overlap/Shared
       - path: Overlap/tvOS
-      - path: Overlap/Resources/combos.json
       - path: Overlap/Resources/tvOS.xcassets
     settings:
       base:

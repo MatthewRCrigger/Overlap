@@ -1,7 +1,7 @@
 import Foundation
 
-/// The app only calls this after a bundled and previously generated recipe
-/// both miss. The OpenAI credential stays exclusively in the Cloudflare Worker.
+/// The app asks the shared recipe service for every new local pair. The service
+/// checks D1 before using OpenAI; the credential stays in the Cloudflare Worker.
 struct ComboFallbackClient: Sendable {
     struct GeneratedCombo: Decodable, Sendable {
         let name: String
