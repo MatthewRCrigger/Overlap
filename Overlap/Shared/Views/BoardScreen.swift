@@ -53,12 +53,12 @@ struct BoardScreen: View {
             }
         }
         .background(Token.surface)
-        .confirmationDialog("Reset your game?", isPresented: $showingResetConfirmation, titleVisibility: .visible) {
-            Button("Reset Progress", role: .destructive) {
+        .confirmationDialog("Start a new run?", isPresented: $showingResetConfirmation, titleVisibility: .visible) {
+            Button("New Run") {
                 game.resetProgress()
             }
         } message: {
-            Text("This permanently removes every discovery and attempted combination. You’ll start again with Water, Fire, Wind, and Earth.")
+            Text("Your current run is kept. The new run starts with Water, Fire, Wind, and Earth using the same context.")
         }
     }
 
@@ -120,7 +120,6 @@ struct BoardScreen: View {
                         .position(point)
                 }
 
-                if case .deadEnd = game.phase { deadEndToast.position(center(geo)) }
 
                 // A match reads in place: the result pill has already landed on
                 // the board above, and this names it. No takeover, no merge —
@@ -189,7 +188,7 @@ struct BoardScreen: View {
             Button(role: .destructive) {
                 showingResetConfirmation = true
             } label: {
-                Text("Reset game").font(.control(13.5))
+                Text("New run").font(.control(13.5))
             }
 
             Rectangle().fill(Token.hairline).frame(width: Token.hairlineWidth, height: 22)
@@ -323,17 +322,6 @@ struct BoardScreen: View {
         return matches.first(where: { $0 != id }) ?? matches.first(where: { $0 == id })
     }
 
-    @ViewBuilder
-    private var deadEndToast: some View {
-        VStack(spacing: 5) {
-            Text("Nothing in common.")
-                .font(.control(15))
-                .foregroundStyle(Token.ink)
-        }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 12)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Token.Radius.card, style: .continuous))
-    }
 
     // MARK: - Toolbar
 

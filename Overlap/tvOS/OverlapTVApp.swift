@@ -50,12 +50,12 @@ struct TVCombineScreen: View {
             }
         }
         .animation(Token.revealCurve, value: game.phase)
-        .confirmationDialog("Reset your game?", isPresented: $showingResetConfirmation, titleVisibility: .visible) {
-            Button("Reset Progress", role: .destructive) {
+        .confirmationDialog("Start a new run?", isPresented: $showingResetConfirmation, titleVisibility: .visible) {
+            Button("New Run") {
                 game.resetProgress()
             }
         } message: {
-            Text("This permanently removes every discovery and attempted combination. You’ll start again with Water, Fire, Wind, and Earth.")
+            Text("Your current run is kept. The new run starts with Water, Fire, Wind, and Earth using the same context.")
         }
     }
 
@@ -72,7 +72,7 @@ struct TVCombineScreen: View {
                     .foregroundStyle(Color(red: 235/255, green: 235/255, blue: 245/255, opacity: 0.55))
             }
             Spacer()
-            Button("Reset game") {
+            Button("New run") {
                 showingResetConfirmation = true
             }
             .buttonStyle(.bordered)
@@ -118,7 +118,7 @@ struct TVCombineScreen: View {
     private var focusRow: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 30) {
-                ForEach(game.collectionNewestFirst.prefix(8), id: \.self) { id in
+                ForEach(game.trayOrder, id: \.self) { id in
                     TVTile(
                         emoji: game.emoji(of: id),
                         label: game.name(of: id)
@@ -126,8 +126,6 @@ struct TVCombineScreen: View {
                         game.pick(id)
                     }
                 }
-                let remainder = max(0, game.collectedCount - 8)
-                TVTile(emoji: "+\(remainder)", label: "All") {}
             }
             .padding(.vertical, 30)
         }

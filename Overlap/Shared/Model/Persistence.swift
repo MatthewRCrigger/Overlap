@@ -3,7 +3,7 @@ import CoreGraphics
 
 /// The entire save file. Names and keys only — everything else is recomputed at
 /// launch (DATA-MODEL.md §6). Per-device local progress, no sync.
-struct SaveFile: Codable {
+struct SaveFile: Codable, Sendable {
     var collection: [String] = []      // element names, insertion-ordered
     var tried: [String] = []           // combo keys
     var board: [String: BoardPoint] = [:]  // iPad/Mac parked positions
@@ -13,12 +13,12 @@ struct SaveFile: Codable {
     var aiElements: [String: AIElement]?
     var aiCombos: [String: String]?
 
-    struct AIElement: Codable {
+    struct AIElement: Codable, Sendable {
         var name: String
         var emoji: String
     }
 
-    struct BoardPoint: Codable {
+    struct BoardPoint: Codable, Sendable {
         var x: Double
         var y: Double
         init(_ point: CGPoint) { x = point.x; y = point.y }
@@ -32,7 +32,12 @@ struct SaveFile: Codable {
 struct SaveStore {
     private let url: URL
 
-    init(filename: String = "progress.json") {
+    init(filename: String = "progress.json", url explicitURL: URL? = nil) {
+        if let explicitURL {
+            url = explicitURL
+            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            return
+        }
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
         let folder = base.appendingPathComponent("Overlap", isDirectory: true)

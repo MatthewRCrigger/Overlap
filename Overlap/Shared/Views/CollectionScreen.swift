@@ -11,7 +11,7 @@ struct CollectionScreen: View {
         case all = "All"
         case untried = "Untried leads"
         case deepest = "Deepest"
-        case deadEnds = "Dead ends"
+        case deadEnds = "All pairs tried"
         var id: String { rawValue }
     }
 
@@ -154,7 +154,7 @@ struct CollectionRow: View {
                 .frame(height: 24)
                 .background(Capsule().fill(Token.accent.opacity(0.12)))
         } else {
-            Text("Dead end")
+            Text("All pairs tried")
                 .monoMeta(9.5, tracking: 0.1)
                 .padding(.horizontal, 9)
                 .frame(height: 24)

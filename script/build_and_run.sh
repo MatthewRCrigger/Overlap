@@ -12,12 +12,12 @@ APP_BINARY="$APP_BUNDLE/Contents/MacOS/$APP_NAME"
 
 pkill -x "$APP_NAME" >/dev/null 2>&1 || true
 
-xcodebuild \
+xcodebuild -quiet \
   -project "$ROOT_DIR/Overlap.xcodeproj" \
   -scheme Overlap-macOS \
   -configuration Debug \
   -derivedDataPath "$BUILD_DIR" \
-  CODE_SIGNING_ALLOWED=NO \
+  -allowProvisioningUpdates \
   build
 
 if [[ ! -x "$APP_BINARY" ]]; then

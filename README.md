@@ -44,7 +44,7 @@ After creating a D1 database, replace `database_id` in `worker/wrangler.jsonc` w
 The Worker exposes:
 
 - `GET /health`
-- `POST /v1/combine` with JSON such as `{ "left": "Water", "right": "Fire" }`
+- `POST /v1/combine` with JSON such as `{ "left": "Water", "right": "Fire", "context": "Minecraft" }`; omitted context means `none`.
 
 Keep `OPENAI_API_KEY` solely in Cloudflare’s encrypted Worker secrets. Do not add it to an Xcode build setting, source file, `.env` committed to Git, or app bundle.
 
@@ -62,9 +62,11 @@ xcodegen generate
 
 ## Privacy and network behavior
 
-The app retains discovered recipes in the player’s local save, but the Worker is the source of truth. Each request contains only the two element names; no account or player data is sent. The Worker checks D1 first, so an OpenAI request is made only for a globally unseen pair.
+The app retains discovered recipes and history locally and syncs runs through the player's private iCloud database. Combination requests contain the two element names and context; no iCloud account data or personal discovery history is sent to the Worker. The Worker checks D1 first, so an OpenAI request is made only for an unseen pair and context.
 
 ## Development notes
+
+The current functional roadmap and build/sync/deployment instructions are in [roadmap/ROADMAP.md](roadmap/ROADMAP.md) and [roadmap/IMPLEMENTATION.md](roadmap/IMPLEMENTATION.md). New runs support explicit contexts, including franchise names, and retain discovery history. The Mac build script now signs the app for private CloudKit sync; unsigned test builds must pass `OVERLAP_CLOUD_SYNC_ENABLED=NO`.
 
 `project.yml` is the source of truth for the Xcode project. After adding or moving Swift files, run:
 

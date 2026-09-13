@@ -28,7 +28,6 @@ enum Phase: Equatable {
     case idle
     case working(PairKey)
     case reveal(Reveal)
-    case deadEnd(PairKey)
 }
 
 struct Reveal: Equatable {
@@ -42,8 +41,6 @@ struct Reveal: Equatable {
 /// Duration of `working → reveal`. The anticipation beat, not latency cover —
 /// the cache lookup is usually fast.
 let combineDelay: Duration = .milliseconds(650)
-/// Dead-end toast dwell.
-let deadEndDwell: Duration = .milliseconds(1900)
 /// Match toast dwell. The reveal is an in-place toast on every platform now,
 /// not a takeover waiting on a button, so it self-clears on the same kind of
 /// timer the dead end uses — a little longer, since there is more to read.
@@ -73,6 +70,7 @@ final class DerivedCache {
 @MainActor
 @Observable
 final class GameState {
+    static let shared = GameState(engine: ComboEngine())
     let engine: ComboEngine
 
     private struct AIElement {
@@ -84,7 +82,7 @@ final class GameState {
     /// reverse ("newest first"); keeping insertion order here makes appends O(1).
     private(set) var collection: [ItemID] = []
     private(set) var collectionSet: Set<ItemID> = []
-    /// Every pair attempted, hits and misses. A miss still consumes the lead.
+    /// Successfully resolved pairs. Transient failures do not consume a pair.
     private(set) var tried: Set<PairKey> = []
     /// Per-device recipe metadata returned by the shared recipe service. The
     /// service is the global source of truth; this cache keeps saved discoveries
@@ -95,12 +93,25 @@ final class GameState {
     var slotA: ItemID?
     var slotB: ItemID?
     private(set) var phase: Phase = .idle
+    var combinationFailure: ComboFallbackClient.Failure?
 
     /// iPad/Mac only — parked positions on the board.
     var boardItems: [ItemID: CGPoint] = [:]
 
     private let store: SaveStore
     private let fallbackClient: ComboFallbackClient
+    private let runStore: RunStore
+    private(set) var runs: [CraftRun] = []
+    private(set) var activeRunID = UUID()
+    private(set) var discoveries: [Discovery] = []
+    private var recipes: [PairKey: CraftRecipe] = [:]
+    private(set) var persistenceError: String?
+    private var archiveUnreadable = false
+    private(set) var isSyncing = false
+    private(set) var syncStatus = "Not synced"
+    private let cloudSync = CloudRunSync()
+    var activeRun: CraftRun? { runs.first { $0.id == activeRunID } }
+    var context: CraftContext { activeRun?.context ?? .none }
     /// The `working → reveal` delay. Cancelled only by a new combine or dismiss.
     private var resolveTask: Task<Void, Never>?
     /// Auto-clear timers (dead-end dwell, reveal failsafe). Kept separate so
@@ -114,12 +125,28 @@ final class GameState {
     init(
         engine: ComboEngine,
         store: SaveStore = SaveStore(),
-        fallbackClient: ComboFallbackClient = ComboFallbackClient()
+        fallbackClient: ComboFallbackClient = ComboFallbackClient(),
+        runStore: RunStore = RunStore()
     ) {
         self.engine = engine
         self.store = store
         self.fallbackClient = fallbackClient
+        self.runStore = runStore
+        do {
+            if let archive = try runStore.load(), !archive.runs.isEmpty {
+                runs = archive.runs
+                activeRunID = runs.contains { $0.id == archive.activeRunID } ? archive.activeRunID : runs[0].id
+                loadRun()
+                return
+            }
+        } catch {
+            archiveUnreadable = true
+            persistenceError = "Saved runs could not be read. The existing file has been preserved."
+        }
         restore()
+        runs = [CraftRun(id: activeRunID, name: "Run 1", context: .none, createdAt: Date(), save: snapshot())]
+        migrateHistory()
+        persist()
     }
 
     private func restore() {
@@ -169,6 +196,19 @@ final class GameState {
     }
 
     func persist() {
+        guard !archiveUnreadable else { return }
+        guard let index = runs.firstIndex(where: { $0.id == activeRunID }) else { return }
+        runs[index].save = snapshot()
+        runs[index].discoveries = discoveries
+        do {
+            try runStore.save(RunArchive(activeRunID: activeRunID, runs: runs))
+            persistenceError = nil
+        } catch {
+            persistenceError = "Progress could not be saved: \(error.localizedDescription)"
+        }
+    }
+
+    private func snapshot() -> SaveFile {
         var file = SaveFile()
         file.collection = collection.map(name(of:))
         file.tried = tried.map(\.key)
@@ -182,8 +222,98 @@ final class GameState {
         file.aiCombos = aiCombos.reduce(into: [:]) { out, entry in
             out[entry.key.key] = entry.value.key
         }
-        // Off the main actor: this runs after every combine.
-        store.saveInBackground(file)
+        return file
+    }
+
+    @discardableResult
+    func createRun(name: String, context text: String) -> Bool {
+        let nextContext = CraftContext(text: text)
+        let title = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard nextContext.isValid, !title.isEmpty, title.count <= 80, !archiveUnreadable else { return false }
+        persist()
+        dismiss()
+        activeRunID = UUID()
+        runs.append(CraftRun(id: activeRunID, name: title, context: nextContext, createdAt: Date(), save: SaveFile()))
+        loadRun()
+        persist()
+        return persistenceError == nil
+    }
+
+    func selectRun(_ id: UUID) {
+        guard id != activeRunID, runs.contains(where: { $0.id == id }) else { return }
+        persist()
+        dismiss()
+        activeRunID = id
+        loadRun()
+        persist()
+    }
+
+    private func loadRun() {
+        guard let run = activeRun else { return }
+        resetToBase()
+        aiElements = (run.save.aiElements ?? [:]).reduce(into: [:]) { out, entry in
+            out[ItemID(entry.key)] = AIElement(name: entry.value.name, emoji: entry.value.emoji)
+        }
+        aiCombos = (run.save.aiCombos ?? [:]).reduce(into: [:]) { $0[PairKey(rawKey: $1.key)] = ItemID($1.value) }
+        for name in run.save.collection {
+            let id = ItemID(name)
+            if collectionSet.insert(id).inserted { collection.append(id) }
+            if engine.element(id) == nil, aiElements[id] == nil { aiElements[id] = AIElement(name: name, emoji: "◇") }
+        }
+        tried = Set(aiCombos.keys)
+        boardItems = run.save.board.reduce(into: [:]) { out, entry in
+            let id = ItemID(entry.key)
+            if collectionSet.contains(id) { out[id] = entry.value.cgPoint }
+        }
+        discoveries = run.discoveries
+        recipes = [:]
+        for event in discoveries where recipes[event.recipe.pair] == nil { recipes[event.recipe.pair] = event.recipe }
+        undoStack = []
+        invalidateDerived()
+    }
+
+    private func item(_ id: ItemID) -> CraftItem { CraftItem(name: name(of: id), emoji: emoji(of: id)) }
+
+    private func migrateHistory() {
+        // Pair order in a legacy dictionary was not chronological; dates remain unknown.
+        for pair in aiCombos.keys.sorted(by: { $0.key < $1.key }) {
+            let inputs = ComboEngine.parseInputs(of: pair)
+            guard inputs.count == 2, let result = aiCombos[pair] else { continue }
+            let recipe = CraftRecipe(left: item(inputs[0]), right: item(inputs[1]), result: item(result), context: .none, source: "legacy", promptVersion: "legacy", generatedAt: nil)
+            recipes[pair] = recipe
+            discoveries.append(Discovery(id: UUID(), runID: activeRunID, recipe: recipe, discoveredAt: nil))
+        }
+        tried = Set(aiCombos.keys)
+    }
+
+    var historyNewestFirst: [Discovery] { discoveries.reversed() }
+    var recentIngredients: [ItemID] {
+        var seen: Set<ItemID> = []
+        return discoveries.reversed().flatMap { [$0.recipe.result.id, $0.recipe.left.id, $0.recipe.right.id] }
+            .filter { seen.insert($0).inserted }
+    }
+
+    func ancestry(of item: ItemID) -> [ChainStep] { walkAncestry(from: item) }
+
+    func synchronize() async {
+        guard !isSyncing, !archiveUnreadable else { return }
+        persist()
+        guard persistenceError == nil else { return }
+        isSyncing = true
+        defer { isSyncing = false }
+        do {
+            let incoming = try await cloudSync.synchronize(runs)
+            // A combine or run change may have completed while awaiting the network.
+            persist()
+            for remote in incoming {
+                if let index = runs.firstIndex(where: { $0.id == remote.id }) {
+                    runs[index] = RunMerge.merge(runs[index], remote)
+                } else { runs.append(remote) }
+            }
+            loadRun()
+            persist()
+            syncStatus = persistenceError ?? "Synced"
+        } catch { syncStatus = error.localizedDescription }
     }
 
     // MARK: - Input
@@ -236,8 +366,7 @@ final class GameState {
         guard let a = slotA, let b = slotB else { return }
         let pair = PairKey(a, b)
         phase = .working(pair)
-        // Recorded now, hit or miss — the attempt itself consumes the lead.
-        tried.insert(pair)
+        combinationFailure = nil
 
         resolveTask?.cancel()
         timerTask?.cancel()
@@ -255,19 +384,19 @@ final class GameState {
         }
 
         guard !Task.isCancelled, case .working(pair) = phase else { return }
-        guard let generated = await fallbackClient.combine(left: name(of: a), right: name(of: b)) else {
-            phase = .deadEnd(pair)
-            persist()
-            timerTask = Task { [weak self] in
-                try? await Task.sleep(for: deadEndDwell)
-                guard let self, !Task.isCancelled else { return }
-                if case .deadEnd = self.phase { self.dismiss() }
-            }
+        let generated: ComboFallbackClient.GeneratedCombo
+        do {
+            generated = try await fallbackClient.combine(left: name(of: a), right: name(of: b), context: context)
+        } catch {
+            guard !Task.isCancelled else { return }
+            phase = .idle
+            combinationFailure = error as? ComboFallbackClient.Failure ?? .unavailable
             return
         }
         guard !Task.isCancelled, case .working(pair) = phase else { return }
 
         let result = ItemID(generated.name)
+        recipes[pair] = CraftRecipe(left: item(a), right: item(b), result: CraftItem(name: generated.name, emoji: generated.emoji), context: context, source: generated.source ?? "ai", promptVersion: generated.promptVersion ?? "legacy", generatedAt: generated.generatedAt)
         aiCombos[pair] = result
         if engine.element(result) == nil {
             aiElements[result] = AIElement(name: generated.name, emoji: generated.emoji)
@@ -276,6 +405,11 @@ final class GameState {
     }
 
     private func resolveKnown(pair: PairKey, a: ItemID, b: ItemID, result: ItemID) {
+        tried.insert(pair)
+        if let recipe = recipes[pair] {
+            discoveries.append(Discovery(id: UUID(), runID: activeRunID, recipe: recipe, discoveredAt: Date()))
+        }
+        invalidateDerived()
         let isNew = !collectionSet.contains(result)
         if isNew {
             collection.append(result)
@@ -328,13 +462,13 @@ final class GameState {
         boardItems[result] = landing
     }
 
-    /// Recovers from a `.reveal` or `.deadEnd` that nothing dismissed. The
+    /// Recovers from a `.reveal` that nothing dismissed. The
     /// reveal is meant to be dismissed by the player, but a phase that outlives
     /// its view refuses all input forever, which is unrecoverable without this.
     /// Cheap insurance on a state the player cannot otherwise escape.
     func recoverIfStuck() {
         switch phase {
-        case .reveal, .deadEnd: dismiss()
+        case .reveal: dismiss()
         case .idle, .working: break
         }
     }
@@ -346,6 +480,12 @@ final class GameState {
         slotA = nil
         slotB = nil
         phase = .idle
+        combinationFailure = nil
+    }
+
+    func retryCombination() {
+        guard acceptsInput, slotA != nil, slotB != nil else { return }
+        combine()
     }
 
     /// "Use it as item one" — loads the result into the left circle.
@@ -371,20 +511,9 @@ final class GameState {
         persist()
     }
 
-    /// Erases local progress and restores the four starter elements.
+    /// Starts fresh while retaining the previous run and its discoveries.
     func resetProgress() {
-        resolveTask?.cancel(); resolveTask = nil
-        timerTask?.cancel(); timerTask = nil
-        slotA = nil
-        slotB = nil
-        phase = .idle
-        resetToBase()
-        aiElements.removeAll()
-        aiCombos.removeAll()
-        undoStack.removeAll()
-        dictionaryDidChange = false
-        invalidateDerived()
-        persist()
+        createRun(name: "Run \(runs.count + 1)", context: context.text)
     }
 
     // MARK: - Undo
@@ -406,11 +535,7 @@ final class GameState {
 
     func undo() {
         guard let entry = undoStack.popLast() else { return }
-        tried.remove(entry.pair)
-        if let added = entry.addedResult, let index = collection.lastIndex(of: added) {
-            collection.remove(at: index)
-            collectionSet.remove(added)
-        }
+        // Undo affects the workspace. Discovered knowledge and history are permanent.
         boardItems = entry.boardBefore
         invalidateDerived()
         dismiss()
@@ -508,10 +633,9 @@ final class GameState {
 
     /// The two items that first produced this one, when known.
     func recipe(for id: ItemID) -> (ItemID, ItemID)? {
-        guard let pair = aiCombos.first(where: { $0.value == id })?.key else { return nil }
-        let inputs = ComboEngine.parseInputs(of: pair)
-        guard inputs.count == 2 else { return nil }
-        return (inputs[0], inputs[1])
+        guard engine.element(id)?.isBase != true,
+              let event = discoveries.first(where: { $0.recipe.result.id == id }) else { return nil }
+        return (event.recipe.left.id, event.recipe.right.id)
     }
 
     // MARK: - Chains

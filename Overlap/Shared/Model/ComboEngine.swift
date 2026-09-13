@@ -2,7 +2,7 @@ import Foundation
 
 /// Normalized identity for an element. Display names are the identity, so all
 /// comparisons use this normalized key.
-struct ItemID: Hashable, Codable, CustomStringConvertible {
+struct ItemID: Hashable, Codable, CustomStringConvertible, Sendable {
     let key: String
 
     init(_ name: String) {
@@ -16,14 +16,23 @@ struct ItemID: Hashable, Codable, CustomStringConvertible {
 }
 
 /// A pair of items, order-independent. Sorting happens once, at init.
-struct PairKey: Hashable, Codable, CustomStringConvertible {
+struct PairKey: Hashable, Codable, CustomStringConvertible, Sendable {
     let key: String
 
     init(_ a: ItemID, _ b: ItemID) {
-        key = [a.key, b.key].sorted().joined(separator: "+")
+        let names = [a.key, b.key].sorted()
+        key = String(data: try! JSONEncoder().encode(names), encoding: .utf8)!
     }
 
-    init(rawKey: String) { key = rawKey }
+    init(rawKey: String) {
+        if let data = rawKey.data(using: .utf8),
+           let parts = try? JSONDecoder().decode([String].self, from: data), parts.count == 2 {
+            self.init(ItemID(parts[0]), ItemID(parts[1]))
+        } else {
+            let parts = rawKey.split(separator: "+", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+            self.init(ItemID(parts[0]), ItemID(parts.count == 2 ? parts[1] : parts[0]))
+        }
+    }
 
     var description: String { key }
 }
@@ -62,9 +71,8 @@ final class ComboEngine: @unchecked Sendable {
     /// A remote recipe key still needs to be decoded locally for save recovery
     /// and player-specific discovery chains.
     static func parseInputs(of pair: PairKey) -> [ItemID] {
-        let parts = pair.key.split(separator: "+", maxSplits: 1).map(String.init)
-        guard parts.count == 2 else { return [ItemID(pair.key)] }
-        let a = ItemID(parts[0]), b = ItemID(parts[1])
-        return a == b ? [a] : [a, b]
+        guard let data = pair.key.data(using: .utf8),
+              let parts = try? JSONDecoder().decode([String].self, from: data), parts.count == 2 else { return [] }
+        return parts.map(ItemID.init)
     }
 }

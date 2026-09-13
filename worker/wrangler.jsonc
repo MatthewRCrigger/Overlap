@@ -3,6 +3,10 @@
   "name": "overlap-combos",
   "main": "src/index.ts",
   "compatibility_date": "2026-09-12",
+  "vars": { "DAILY_GENERATION_LIMIT": "500" },
+  "ratelimits": [
+    { "name": "COMBINE_LIMITER", "namespace_id": "1001", "simple": { "limit": 60, "period": 60 } }
+  ],
   "secrets": {
     "required": ["OPENAI_API_KEY"]
   },

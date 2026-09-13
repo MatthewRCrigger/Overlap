@@ -18,6 +18,8 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>CloudSyncEnabled</key>
+	<string>$(OVERLAP_CLOUD_SYNC_ENABLED)</string>
 	<key>ComboFallbackEndpoint</key>
 	<string>$(COMBO_FALLBACK_ENDPOINT)</string>
 </dict>

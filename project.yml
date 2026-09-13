@@ -16,8 +16,22 @@ settings:
     CODE_SIGN_STYLE: Automatic
     SWIFT_STRICT_CONCURRENCY: complete
     GENERATE_INFOPLIST_FILE: NO
+    OVERLAP_CLOUD_SYNC_ENABLED: "YES"
 
 targets:
+  OverlapTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: Overlap-macOS
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.crggr.overlap.tests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Overlap.app/Contents/MacOS/Overlap"
+        BUNDLE_LOADER: "$(TEST_HOST)"
   # iPhone + iPad share one target: same model layer, input model differs by idiom.
   Overlap-iOS:
     type: application
@@ -30,6 +44,7 @@ targets:
       path: Config/Info-iOS.plist
       properties:
         ComboFallbackEndpoint: "$(COMBO_FALLBACK_ENDPOINT)"
+        CloudSyncEnabled: "$(OVERLAP_CLOUD_SYNC_ENABLED)"
     sources:
       - path: Overlap/Shared
       - path: Overlap/iOS
@@ -38,6 +53,7 @@ targets:
       base:
         PRODUCT_NAME: Overlap
         PRODUCT_BUNDLE_IDENTIFIER: com.crggr.overlap
+        CODE_SIGN_ENTITLEMENTS: Config/Overlap-Cloud.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
@@ -55,6 +71,7 @@ targets:
       path: Config/Info-macOS.plist
       properties:
         ComboFallbackEndpoint: "$(COMBO_FALLBACK_ENDPOINT)"
+        CloudSyncEnabled: "$(OVERLAP_CLOUD_SYNC_ENABLED)"
     sources:
       - path: Overlap/Shared
       - path: Overlap/macOS
@@ -64,7 +81,7 @@ targets:
         PRODUCT_NAME: Overlap
         PRODUCT_BUNDLE_IDENTIFIER: com.crggr.overlap
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        CODE_SIGN_ENTITLEMENTS: Config/Overlap-macOS.entitlements
+        CODE_SIGN_ENTITLEMENTS: Config/Overlap-macOS-Cloud.entitlements
         ENABLE_APP_SANDBOX: YES
         ENABLE_HARDENED_RUNTIME: YES
 
@@ -79,6 +96,7 @@ targets:
       path: Config/Info-tvOS.plist
       properties:
         ComboFallbackEndpoint: "$(COMBO_FALLBACK_ENDPOINT)"
+        CloudSyncEnabled: "$(OVERLAP_CLOUD_SYNC_ENABLED)"
     sources:
       - path: Overlap/Shared
       - path: Overlap/tvOS
@@ -87,6 +105,7 @@ targets:
       base:
         PRODUCT_NAME: Overlap
         PRODUCT_BUNDLE_IDENTIFIER: com.crggr.overlap
+        CODE_SIGN_ENTITLEMENTS: Config/Overlap-Cloud.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: "App Icon"
         TVOS_DEPLOYMENT_TARGET: "26.0"
         INFOPLIST_KEY_UIUserInterfaceStyle: Dark

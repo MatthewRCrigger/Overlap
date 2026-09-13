@@ -7,14 +7,14 @@ const entries = Object.entries(raw.combos ?? {});
 
 const escape = (value) => String(value).replaceAll("'", "''");
 const normalize = (value) => value.trim().normalize("NFC").toLowerCase();
-const pairKey = (key) => key.split("+").map(normalize).sort().join("+");
+const pairKey = (key) => JSON.stringify(key.split("+").map(normalize).sort());
 const resultKey = (value) => normalize(value);
 
 const statements = entries.map(([key, value]) => {
   if (!value || typeof value.result !== "string" || typeof value.emoji !== "string") {
     throw new Error(`Malformed recipe for ${key}`);
   }
-  return `INSERT OR IGNORE INTO recipes (pair_key, result_key, result_name, emoji, source) VALUES ('${escape(pairKey(key))}', '${escape(resultKey(value.result))}', '${escape(value.result.trim())}', '${escape(value.emoji.trim())}', 'seed');`;
+  return `INSERT OR IGNORE INTO context_recipes (pair_key, context_key, context_text, result_key, result_name, emoji, source, prompt_version) VALUES ('${escape(pairKey(key))}', 'v1:none', 'none', '${escape(resultKey(value.result))}', '${escape(value.result.trim())}', '${escape(value.emoji.trim())}', 'seed', 'seed-v1');`;
 });
 
 await writeFile(resolve(process.cwd(), outputPath), `${statements.join("\n")}\n`);

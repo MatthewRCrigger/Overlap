@@ -17,7 +17,6 @@ struct CombineScreen: View {
             }
         }
         .background(Token.surface)
-        .overlay(alignment: .center) { deadEndToast }
         .overlay(alignment: .center) { matchToast }
         .animation(Token.revealCurve, value: game.phase)
         .onChange(of: game.phase) { _, phase in
@@ -27,12 +26,12 @@ struct CombineScreen: View {
                 animator.reset()
             }
         }
-        .confirmationDialog("Reset your game?", isPresented: $showingResetConfirmation, titleVisibility: .visible) {
-            Button("Reset Progress", role: .destructive) {
+        .confirmationDialog("Start a new run?", isPresented: $showingResetConfirmation, titleVisibility: .visible) {
+            Button("New Run") {
                 game.resetProgress()
             }
         } message: {
-            Text("This permanently removes every discovery and attempted combination. You’ll start again with Water, Fire, Wind, and Earth.")
+            Text("Your current run is kept. The new run starts with Water, Fire, Wind, and Earth using the same context.")
         }
     }
 
@@ -104,30 +103,6 @@ struct CombineScreen: View {
         }
     }
 
-    // MARK: - Dead end
-
-    @ViewBuilder
-    private var deadEndToast: some View {
-        if case .deadEnd(let pair) = game.phase {
-            let names = ComboEngine.parseInputs(of: pair).map { game.name(of: $0) }
-            let recipe = names.count == 2 ? "\(names[0]) + \(names[1])" : "\(names[0]) + \(names[0])"
-            VStack(spacing: 6) {
-                Text("Nothing in common.")
-                    .font(.control(15))
-                    .foregroundStyle(Token.ink)
-                Text("\(recipe) — empty lens")
-                    .monoMeta(9.5, tracking: 0.1)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 14)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Token.Radius.card, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Token.Radius.card, style: .continuous)
-                    .strokeBorder(Token.hairline, lineWidth: Token.hairlineWidth)
-            )
-            .transition(.move(edge: .bottom).combined(with: .opacity))
-        }
-    }
 }
 
 /// 44×44 glass circle with a blue glyph, per the header spec.
@@ -163,7 +138,7 @@ struct CollectionShelf: View {
             HStack {
                 Text("Your collection").monoMeta(10)
                 Spacer()
-                Button("Reset") {
+                Button("New run") {
                     onReset()
                 }
                 .font(.system(size: 12, weight: .medium))

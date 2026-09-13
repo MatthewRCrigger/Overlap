@@ -1,5 +1,18 @@
 # Overlap Roadmap
 
+## Implementation status — 2026-09-13
+
+| Phase | Implementation | Verification / remaining work |
+| --- | --- | --- |
+| 0: Data contract | Complete | Context normalization, recipe identity, and legacy migration tested. |
+| 1: Online core | Complete | Retryable errors, immutable cached results, and history tested; all platform targets build. |
+| 2: Runs and context | Complete locally | Worker/D1 deployment requires approval; live context generation remains pending. |
+| 3: History and lineage | Complete | Migration, repeated discoveries, ancestry, cancellation, and persistence tested. |
+| 4: iCloud | Implemented | Signed Mac app successfully synced with private CloudKit. Concurrent merge tests pass. Physical iPhone/iPad/Apple TV handoff still needs device validation. |
+| 5: Operations | Complete locally | Type check, service tests, dry-run bundle, and local D1 migrations pass. Deployment and live quality checks remain pending. |
+
+See [implementation and validation notes](IMPLEMENTATION.md) for build commands, sync behavior, service limits, and deployment steps. UI controls use functional labels; visual design remains deferred.
+
 ## Product direction
 
 Overlap is a casual, single-player, infinite crafting game for iPhone, iPad, Mac, and Apple TV. Players combine items, receive an online-generated result, and retain a durable personal discovery history.
@@ -39,7 +52,7 @@ This roadmap intentionally specifies functionality, data, and service behavior o
 - Resolve every unrecognized pair through the Worker and Luna, then persist the generated response.
 - Define loading, timeout, unavailable, and retry states for callers.
 - Save successful combinations locally with their inputs, result, timestamp, and source.
-- Tune the Luna prompt for concise, familiar, original, family-safe nouns and emojis.
+- Tune the Luna prompt for concise, familiar, family-safe nouns and emojis, including franchise characters, objects, and locations when relevant to the supplied context.
 - Verify shared model and service behavior across all platform targets.
 
 **Exit criteria:** A player can keep discovering meaningful new items online in a dependable `None` run.
@@ -94,10 +107,10 @@ This roadmap intentionally specifies functionality, data, and service behavior o
 - Add Worker rate limiting and spend/latency monitoring.
 - Track operational events: cache hit rate, generation success, latency, failure reason, and moderation rejection.
 - Create a server-side override/disable path for unsafe, confusing, duplicate, or low-quality recipes.
-- Maintain generation safety checks and original-content rules.
+- Maintain family-friendly generation rules and response validation while allowing named IP results.
 - Review prompt quality periodically without modifying any previously generated player recipe.
 
-**Exit criteria:** The service can be safely operated as a public family game backend.
+**Exit criteria:** The service supports friends-and-family play with bounded generation usage and inspectable failures.
 
 ## Recommended implementation sequence
 
@@ -111,4 +124,4 @@ This roadmap intentionally specifies functionality, data, and service behavior o
 
 ## Current architecture impact
 
-The current Worker cache is global and keyed only by a normalized input pair. It must be changed before contexts launch; otherwise a result created in one context could incorrectly be returned in every other context. The existing client already locally retains generated recipes and includes early ancestry support. Those pieces can be evolved into explicit run-scoped discovery history.
+The implementation adds a context-specific cache while retaining the legacy recipe table. Local saves migrate into a `none` run and keep their discovered items. Until the new Worker is deployed, custom-context responses from the old service are rejected by the client to prevent cross-context contamination.
