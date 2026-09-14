@@ -12,6 +12,10 @@ struct CraftContext: Codable, Hashable, Sendable {
         self.text = clean.isEmpty || clean.lowercased() == "none" ? "none" : clean
     }
 
+    /// `none` is the sentinel for "no context set", not a context named
+    /// "none" — chrome and copy must not print it as if it were one.
+    var isUnset: Bool { text == "none" }
+
     var isValid: Bool {
         text.utf16.count <= 256 && !text.unicodeScalars.contains { CharacterSet.controlCharacters.contains($0) }
     }

@@ -33,7 +33,11 @@ enum Token {
     static let accent = Color(hex: 0x007AFF)
     /// Accent as text on light needs the darker step for contrast.
     static let accentText = Color(light: Color(hex: 0x0060DF), dark: Color(hex: 0x007AFF))
-    static let revealAccent = Color(hex: 0x5E5CE6)
+    /// The one place tint appears. Brightened on dark so it holds up against
+    /// black without shifting hue.
+    static let revealAccent = Color(light: Color(hex: 0x5E5CE6), dark: Color(hex: 0x7D7AFF))
+    /// Run-level warnings — the offline banner is the only user of this.
+    static let warning = Color(light: Color(hex: 0xFFCC00), dark: Color(hex: 0xFFD426))
 
     // MARK: - Neutral item tint
 
@@ -139,7 +143,9 @@ extension View {
             .foregroundStyle(color)
     }
 
-    /// A hairline on one edge.
+    /// A hairline on one edge. Purely decorative: the rule is an overlay, and
+    /// an overlay that accepts hits sits above the view's own controls and
+    /// eats their taps, so it must never be hit-testable.
     func hairline(_ edge: Edge) -> some View {
         overlay(alignment: edge.alignment) {
             Rectangle()
@@ -148,6 +154,7 @@ extension View {
                     width: edge == .leading || edge == .trailing ? Token.hairlineWidth : nil,
                     height: edge == .top || edge == .bottom ? Token.hairlineWidth : nil
                 )
+                .allowsHitTesting(false)
         }
     }
 }

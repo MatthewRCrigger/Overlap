@@ -95,6 +95,12 @@ final class GameState {
     private(set) var phase: Phase = .idle
     var combinationFailure: ComboFallbackClient.Failure?
 
+    /// Run-level connectivity, distinct from `combinationFailure`, which is
+    /// about one pair. The board shows this as a persistent banner: pairs
+    /// already resolved still work offline because they are read from the
+    /// local catalog, so the game stays partly playable and the message says so.
+    private(set) var isOffline = false
+
     /// iPad/Mac only — parked positions on the board.
     var boardItems: [ItemID: CGPoint] = [:]
 
@@ -390,10 +396,17 @@ final class GameState {
         } catch {
             guard !Task.isCancelled else { return }
             phase = .idle
-            combinationFailure = error as? ComboFallbackClient.Failure ?? .unavailable
+            let failure = error as? ComboFallbackClient.Failure ?? .unavailable
+            // Only a genuine connectivity failure raises the run-level banner;
+            // a blocked or malformed pair is about that pair alone.
+            isOffline = (failure == .offline)
+            combinationFailure = failure
             return
         }
         guard !Task.isCancelled, case .working(pair) = phase else { return }
+
+        // A completed fetch is the only reliable proof the connection is back.
+        isOffline = false
 
         let result = ItemID(generated.name)
         recipes[pair] = CraftRecipe(left: item(a), right: item(b), result: CraftItem(name: generated.name, emoji: generated.emoji), context: context, source: generated.source ?? "ai", promptVersion: generated.promptVersion ?? "legacy", generatedAt: generated.generatedAt)

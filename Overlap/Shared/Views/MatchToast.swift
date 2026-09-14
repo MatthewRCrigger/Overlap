@@ -30,7 +30,16 @@ struct MatchToast: View {
                 .font(.system(size: isTV ? 64 : 40))
                 .scaleEffect(popped ? 1 : 0.6)
                 .animation(Token.emojiPop, value: popped)
-                .onAppear { popped = true }
+                .onAppear {
+                    popped = true
+                    // Success fires for a new item only — an item you already
+                    // owned is a result, not a discovery.
+                    #if os(iOS)
+                    if reveal.isNew {
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                    }
+                    #endif
+                }
 
             Text(game.name(of: reveal.result))
                 .font(.display(isTV ? 34 : 22))

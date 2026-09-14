@@ -39,6 +39,31 @@ struct ItemPill: View {
 
     private var maxNameLength: Int { 18 }
 
+    /// Measures a pill without rendering one, so the board can size drop
+    /// targets and halos to the pill they actually belong to.
+    static func width(emoji: String, name: String, size: PillSize) -> CGFloat {
+        #if canImport(UIKit)
+        let labelFont = UIFont.systemFont(ofSize: size.label, weight: .semibold)
+        let emojiFont = UIFont.systemFont(ofSize: size.emoji)
+        let labelWidth = (name as NSString)
+            .size(withAttributes: [.font: labelFont]).width
+        let emojiWidth = (emoji as NSString)
+            .size(withAttributes: [.font: emojiFont]).width
+        #elseif canImport(AppKit)
+        let labelFont = NSFont.systemFont(ofSize: size.label, weight: .semibold)
+        let emojiFont = NSFont.systemFont(ofSize: size.emoji)
+        let labelWidth = (name as NSString)
+            .size(withAttributes: [.font: labelFont]).width
+        let emojiWidth = (emoji as NSString)
+            .size(withAttributes: [.font: emojiFont]).width
+        #else
+        let labelWidth = CGFloat(name.count) * size.label * 0.55
+        let emojiWidth = size.emoji * 1.2
+        #endif
+        // emoji + gap + label, inside the pill's own horizontal padding.
+        return ceil(emojiWidth + 8 + labelWidth + size.paddingInline * 2)
+    }
+
     var body: some View {
         HStack(spacing: 8) {
             if style == .locked {
