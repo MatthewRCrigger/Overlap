@@ -8,7 +8,7 @@ function database() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(readFileSync(new URL('../migrations/0001_create_recipes.sql', import.meta.url), 'utf8'));
   sqlite.prepare("INSERT INTO recipes(pair_key,result_key,result_name,emoji,source) VALUES ('fire+fire','volcano','Volcano','🌋','seed')").run();
-  for (const file of ['0002_context_recipes.sql', '0003_operations.sql']) {
+  for (const file of ['0002_context_recipes.sql', '0003_operations.sql', '0004_normalize_recipe_identity.sql', '0005_canonical_elements.sql']) {
     sqlite.exec(readFileSync(new URL('../migrations/' + file, import.meta.url), 'utf8'));
   }
   return { sqlite, prepare(sql) {
@@ -46,14 +46,54 @@ test('migration preserves none recipe; IP context generates and caches independe
   };
   try {
     const first = await (await worker.fetch(request('Minecraft'), config)).json();
-    const repeat = await (await worker.fetch(request(' minecraft '), config)).json();
+    const repeat = await (await worker.fetch(request(' minecraft ', 'Fire', 'Fire'), config)).json();
     assert.equal(first.name, 'Nether');
     assert.deepEqual(first, repeat);
     assert.equal(calls, 1);
     assert.equal(first.contextKey, 'v1:minecraft');
-    assert.equal(first.promptVersion, 'context-v1');
+    assert.equal(first.promptVersion, 'context-v2');
     assert.equal(db.sqlite.prepare('SELECT input_tokens FROM generation_usage').get().input_tokens, 100);
   } finally { globalThis.fetch = originalFetch; db.sqlite.close(); }
+});
+
+test('reversed inputs retrieve the exact cached result and emoji', async () => {
+  const db = database();
+  const config = env(db);
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    return Response.json({ output_text: JSON.stringify({ name: 'Mud', emoji: '🟤' }), usage: {} });
+  };
+  try {
+    const first = await (await worker.fetch(request('Table', 'Water', 'Earth'), config)).json();
+    const reversed = await (await worker.fetch(request(' table ', 'Earth', 'Water'), config)).json();
+    assert.deepEqual(reversed, first);
+    assert.equal(reversed.emoji, '🟤');
+    assert.equal(calls, 1);
+  } finally { globalThis.fetch = originalFetch; db.sqlite.close(); }
+});
+
+test('a canonical element emoji is shared by every recipe that produces it', async () => {
+  const db = database();
+  db.sqlite.prepare("INSERT INTO context_recipes(pair_key,context_key,context_text,result_key,result_name,emoji,source,prompt_version) VALUES (?, 'v1:none', 'none', 'steam', 'Steam', '♨️', 'ai', 'legacy')")
+    .run(pairKey('Fire', 'Rain'));
+  db.sqlite.prepare("INSERT OR IGNORE INTO elements(result_key,name,emoji,source) VALUES ('steam', 'Steam', '💨', 'seed')").run();
+  const response = await (await worker.fetch(request('none', 'Fire', 'Rain'), env(db))).json();
+  assert.equal(response.name, 'Steam');
+  assert.equal(response.emoji, '💨');
+  db.sqlite.close();
+});
+
+test('legacy mixed-case rows are normalized so the Worker finds them before generation', async () => {
+  const db = database();
+  db.sqlite.prepare("INSERT INTO context_recipes(pair_key,context_key,context_text,result_key,result_name,emoji,source,prompt_version) VALUES (?, 'v1:table', 'Table', 'dinner table', 'Dinner Table', '🍽️', 'seed', 'legacy')")
+    .run('["Earth","Water"]');
+  db.sqlite.exec(readFileSync(new URL('../migrations/0004_normalize_recipe_identity.sql', import.meta.url), 'utf8'));
+  const response = await (await worker.fetch(request('table', 'Water', 'Earth'), env(db))).json();
+  assert.equal(response.name, 'Dinner Table');
+  assert.equal(response.emoji, '🍽️');
+  db.sqlite.close();
 });
 
 test('disabled and overridden recipes preserve the original row', async () => {

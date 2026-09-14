@@ -398,6 +398,8 @@ final class GameState {
         let result = ItemID(generated.name)
         recipes[pair] = CraftRecipe(left: item(a), right: item(b), result: CraftItem(name: generated.name, emoji: generated.emoji), context: context, source: generated.source ?? "ai", promptVersion: generated.promptVersion ?? "legacy", generatedAt: generated.generatedAt)
         aiCombos[pair] = result
+        // The service returns the canonical element identity, which may repair
+        // an older on-device discovery that used a different recipe emoji.
         if engine.element(result) == nil {
             aiElements[result] = AIElement(name: generated.name, emoji: generated.emoji)
         }

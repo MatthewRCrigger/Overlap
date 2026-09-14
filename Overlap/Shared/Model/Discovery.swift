@@ -2,7 +2,7 @@ import Foundation
 
 struct CraftContext: Codable, Hashable, Sendable {
     let text: String
-    var key: String { "v1:" + text.lowercased() }
+    var key: String { "v1:" + text.lowercased().precomposedStringWithCanonicalMapping }
     static let none = CraftContext(text: "none")
     static let suggestions = ["Minecraft", "How To Train Your Dragon"]
 
