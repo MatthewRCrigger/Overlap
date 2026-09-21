@@ -100,35 +100,38 @@ xcodegen generate
 ### Local configuration
 
 Nothing account-specific is committed to this repository — no Apple Developer
-Team ID and no service endpoint. A fork therefore builds without inheriting
+Team ID and no service endpoint. A clone therefore builds without inheriting
 anyone else's account, and cannot call anyone else's Worker.
 
-Both values live in one Git-ignored file. Create it from the template:
+**Every setting below is optional.** With none of them, `xcodegen generate &&
+xcodebuild -scheme Overlap-macOS build` succeeds and the test suite runs, with
+no Apple Developer account at all. You get the game without sync, and without
+the ability to resolve pairs nobody has discovered yet.
+
+To configure anything, start from the template:
 
 ```bash
 cp Config/Overlap.local.xcconfig.example Config/Overlap.local.xcconfig
-```
-
-| Setting | What to put there |
-| --- | --- |
-| `DEVELOPMENT_TEAM` | Your Apple Developer Team ID, from developer.apple.com under Membership. Required to sign the app, and therefore required for iCloud sync |
-| `COMBO_FALLBACK_ENDPOINT` | The HTTPS URL of your deployed Worker, ending in `/v1/combine`. Fill this in after [deploying one](#deploy-your-own-worker) |
-
-Then regenerate the project:
-
-```bash
 xcodegen generate
 ```
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `COMBO_FALLBACK_ENDPOINT` | empty | Your deployed Worker, ending in `/v1/combine`. Set it after [deploying one](#deploy-your-own-worker); without it the app runs but cannot resolve new combinations |
+| `DEVELOPMENT_TEAM` | empty | Your Apple Developer Team ID, from developer.apple.com under Membership. Needed to sign the Mac app, and so a prerequisite for sync |
+| `OVERLAP_MACOS_ENTITLEMENTS` | sandbox + network only | Switch to `Config/Overlap-macOS-Cloud.entitlements` for iCloud |
+| `OVERLAP_CLOUD_SYNC_ENABLED` | `NO` | Set `YES` together with the Cloud entitlements above |
+
+The last two are a pair: iCloud entitlements require a signing certificate, so
+the defaults deliberately leave both off rather than failing the build of a
+fresh clone.
 
 > In an `.xcconfig` value, `//` starts a comment, which would silently truncate
 > a URL. Write it as
 > `https:/$()/your-worker.your-account.workers.dev/v1/combine`.
 
-`Config/Overlap.xcconfig` declares both settings as empty and pulls in your
-local file with `#include?`, so the project still generates and builds when the
-override is absent. Without an endpoint the app runs but cannot resolve new
-combinations; without a team ID you can only build unsigned, which means passing
-`OVERLAP_CLOUD_SYNC_ENABLED=NO`.
+`Config/Overlap.xcconfig` holds those defaults and pulls in your local file with
+`#include?`, so the project still generates and builds when no override exists.
 
 ### Run the Mac app
 
@@ -141,10 +144,8 @@ The script builds the `Overlap-macOS` scheme into `build/local/` and opens the
 app. It accepts `--debug`, `--logs`, `--telemetry`, and `--verify`.
 
 For the other platforms, open `Overlap.xcodeproj` and select `Overlap-iOS` or
-`Overlap-tvOS`.
-
-Cloud sync requires a signed build. Unsigned local builds must pass
-`OVERLAP_CLOUD_SYNC_ENABLED=NO`.
+`Overlap-tvOS`. Simulator builds need no signing team; a device build does, like
+any iOS app.
 
 ### Deploy your own Worker
 
@@ -190,9 +191,8 @@ Eight client and model tests, and eight service tests covering context
 normalization, canonical element identity, legacy row migration, caching, and
 the rate and budget limits.
 
-The Swift tests are hosted by the Mac app, so they need a signing team like any
-other build. `Overlap-macOS` is a shared scheme with the test action already
-wired up, so this works from a fresh clone.
+`Overlap-macOS` is a shared scheme with the test action already wired up, so
+both suites run from a fresh clone with nothing configured.
 
 Before exposing a Worker publicly, add a Cloudflare rate-limit rule for
 `POST /v1/combine`. OpenAI project limits cap spend, but rate limiting is what

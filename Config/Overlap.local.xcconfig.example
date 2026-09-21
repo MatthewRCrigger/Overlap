@@ -6,14 +6,23 @@
 // configuration only — never put an OpenAI API key here. The key belongs in
 // Cloudflare's encrypted Worker secrets and nowhere else.
 //
+// Every setting here is optional. With none of them the project still builds
+// and runs; it simply cannot sign, sync, or resolve new combinations.
+//
 // Re-run `xcodegen generate` after editing.
 
 // Apple Developer Team ID, for example A1B2C3D4E5. Find it at
-// developer.apple.com under Membership. Leave this empty to build unsigned,
-// and pass OVERLAP_CLOUD_SYNC_ENABLED=NO when you build.
+// developer.apple.com under Membership. Needed to sign the Mac app, which in
+// turn is what iCloud sync requires.
 DEVELOPMENT_TEAM =
 
 // Your deployed Worker, ending in /v1/combine.
 // Write https:/$()/ rather than https:// because xcconfig treats // as a
 // comment and would silently truncate the value.
 COMBO_FALLBACK_ENDPOINT = https:/$()/your-worker.your-account.workers.dev/v1/combine
+
+// Uncomment both of these together to turn on private CloudKit sync. They are
+// a pair: the Cloud entitlements are what make the sync flag meaningful, and
+// both need the signing team above.
+// OVERLAP_MACOS_ENTITLEMENTS = Config/Overlap-macOS-Cloud.entitlements
+// OVERLAP_CLOUD_SYNC_ENABLED = YES

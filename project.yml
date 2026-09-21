@@ -15,7 +15,6 @@ settings:
     CODE_SIGN_STYLE: Automatic
     SWIFT_STRICT_CONCURRENCY: complete
     GENERATE_INFOPLIST_FILE: NO
-    OVERLAP_CLOUD_SYNC_ENABLED: "YES"
 
 targets:
   OverlapTests:
@@ -99,7 +98,7 @@ targets:
         PRODUCT_NAME: Overlap
         PRODUCT_BUNDLE_IDENTIFIER: com.crggr.overlap
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        CODE_SIGN_ENTITLEMENTS: Config/Overlap-macOS-Cloud.entitlements
+        CODE_SIGN_ENTITLEMENTS: $(OVERLAP_MACOS_ENTITLEMENTS)
         ENABLE_APP_SANDBOX: YES
         ENABLE_HARDENED_RUNTIME: YES
 

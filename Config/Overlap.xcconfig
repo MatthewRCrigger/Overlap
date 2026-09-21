@@ -6,12 +6,23 @@
 // Git ignores — see Config/Overlap.local.xcconfig.example.
 
 // Your Apple Developer Team ID. Required to sign the app, and therefore
-// required for iCloud sync. Leave empty to build unsigned, and pass
-// OVERLAP_CLOUD_SYNC_ENABLED=NO when you do.
+// required for iCloud sync. Leaving it empty builds the Mac app unsigned,
+// which the entitlement and sync defaults below already account for.
 DEVELOPMENT_TEAM =
 
 // HTTPS URL of your deployed Cloudflare Worker, ending in the route. Without
 // it the app cannot resolve new combinations.
 COMBO_FALLBACK_ENDPOINT =
+
+// Entitlements for the Mac app. The default grants only the sandbox and
+// outbound network access, which builds with no Apple Developer account at
+// all. Point this at Config/Overlap-macOS-Cloud.entitlements in your local
+// override to enable iCloud sync, which does require a signing team.
+OVERLAP_MACOS_ENTITLEMENTS = Config/Overlap-macOS.entitlements
+
+// Private CloudKit sync. Off by default, because it cannot work without the
+// Cloud entitlements above and a signing team. Set to YES in your override
+// alongside OVERLAP_MACOS_ENTITLEMENTS.
+OVERLAP_CLOUD_SYNC_ENABLED = NO
 
 #include? "Overlap.local.xcconfig"
