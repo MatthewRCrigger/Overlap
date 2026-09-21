@@ -1,33 +1,120 @@
 # Overlap
 
-Overlap is a playful SwiftUI element-combining game for iPhone, iPad, Mac, and Apple TV. Start with four familiar elements, discover recipes from a shared online cache, and make new combinations as you play.
+**What can two things become?**
 
-The app sends a pair to a small Cloudflare Worker. The Worker reads the shared D1 recipe cache first; on a miss it asks OpenAI for a family-friendly result, stores it in D1, and returns it. The Worker owns the OpenAI credential; the app never includes it.
+Overlap is a single-player crafting game for iPhone, iPad, Mac, and Apple TV. You
+start with four elements — Water, Fire, Wind, and Earth — and combine pairs to
+discover new ones. When nobody has tried a pair before, a small Cloudflare Worker
+invents the result and remembers it, so the next player who tries that pair gets
+the same answer.
 
-## What is in this repository
+![Platforms](https://img.shields.io/badge/platforms-iOS%20%C2%B7%20iPadOS%20%C2%B7%20macOS%20%C2%B7%20tvOS-0a7bbb)
+![Swift](https://img.shields.io/badge/Swift-6.0%20strict%20concurrency-f05138)
+![License](https://img.shields.io/badge/license-MIT-3fb950)
 
-- `Overlap/` — shared SwiftUI game code plus platform entry points and app resources.
-- `Overlap.xcodeproj/` — generated Xcode project. Edit `project.yml`, then regenerate it with XcodeGen.
-- `worker/` — the Cloudflare Worker, D1 migration, and seed script.
-- `combos.json` — the original recipe data; the app does not bundle this file.
-- `docs/` — supporting material.
+## Platforms
 
-## Run the macOS app
+One SwiftUI codebase and one shared model layer, with the input model chosen per
+idiom rather than lowest common denominator.
 
-Prerequisites: Xcode with the macOS 26 SDK and [XcodeGen](https://github.com/yonaskolb/XcodeGen).
+| Platform | Minimum OS | How you combine |
+| --- | --- | --- |
+| iPhone | iOS 26 | Drag one pill onto another; the tray sits underneath as a shelf |
+| iPad | iPadOS 26 | Drag, with the tray in a leading sidebar |
+| Mac | macOS 26 | The same board and sidebar in a window, driven by a pointer |
+| Apple TV | tvOS 26 | Focus a tile and select, twice. Dark only |
+
+iPhone and iPad share a single target: the model layer is identical and only the
+layout responds to size class.
+
+## How it works
+
+The app knows the four starting elements and nothing else. Every combination is
+resolved through a shared recipe service, so a recipe correction reaches every
+player without shipping a build.
+
+```mermaid
+flowchart LR
+  App["Overlap<br/>iPhone · iPad · Mac · Apple TV"]
+  Worker["Cloudflare Worker"]
+  D1[("D1 recipe cache")]
+  AI["OpenAI"]
+  CK[("Player's private<br/>CloudKit database")]
+
+  App -->|"POST /v1/combine"| Worker
+  Worker <-->|"look up pair + context"| D1
+  Worker -.->|"only on a cache miss"| AI
+  AI -.->|"new recipe, written back"| Worker
+  App <-->|"runs and discovery history"| CK
+```
+
+Three rules shape the data model:
+
+- **A recipe is permanent.** Once a pair resolves in a given context, that result
+  never changes. Improving the generation prompt must not restyle something a
+  player already discovered.
+- **Identity is `input A + input B + context`,** with input order normalized and
+  names compared as NFC-normalized lowercase. `Fire + Water` and `water + fire`
+  are one recipe.
+- **An element owns its own name and emoji,** separately from the recipes that
+  produce it, so Steam looks the same however you got there.
+
+A run may carry a **context** — the explicit default `none`, or a theme such as
+`Minecraft` — which becomes part of the recipe identity. The same two ingredients
+can therefore give a different, fitting result in a different world. Context is
+fixed when a run is created; changing it means starting a new run.
+
+## Project status
+
+The game is functionally complete and runs on all four platforms. Two things are
+outstanding:
+
+- **Visual design pass.** The interface is built to the functional spec and uses
+  functional labels throughout. Layout, motion, and typography have not had a
+  dedicated design pass.
+- **Device validation for sync.** A signed Mac build syncs correctly against
+  private CloudKit, and concurrent merge tests pass. Handoff between physical
+  iPhone, iPad, and Apple TV hardware still needs testing.
+
+See [`roadmap/ROADMAP.md`](roadmap/ROADMAP.md) for the phase-by-phase status and
+[`roadmap/IMPLEMENTATION.md`](roadmap/IMPLEMENTATION.md) for build, sync, and
+deployment notes.
+
+## Getting started
+
+### Prerequisites
+
+- Xcode with the macOS 26, iOS 26, and tvOS 26 SDKs
+- [XcodeGen](https://github.com/yonaskolb/XcodeGen) — `brew install xcodegen`
+- Node.js 20+ and a Cloudflare account, to run your own Worker
+
+`project.yml` is the source of truth for the Xcode project. Generate it before
+the first build, and again after adding or moving any Swift file:
+
+```bash
+xcodegen generate
+```
+
+`project.yml` also carries a `DEVELOPMENT_TEAM` value. Replace it with your own
+Apple Developer Team ID before building a signed app.
+
+### Run the Mac app
 
 ```bash
 xcodegen generate
 ./script/build_and_run.sh
 ```
 
-The script builds the `Overlap-macOS` scheme into `build/local/` and opens the app. It also supports `--debug`, `--logs`, `--telemetry`, and `--verify`.
+The script builds the `Overlap-macOS` scheme into `build/local/` and opens the
+app. It accepts `--debug`, `--logs`, `--telemetry`, and `--verify`.
 
-To work on another platform, open `Overlap.xcodeproj` in Xcode and select `Overlap-iOS` or `Overlap-tvOS`.
+For the other platforms, open `Overlap.xcodeproj` and select `Overlap-iOS` or
+`Overlap-tvOS`.
 
-## Configure and deploy the Worker
+Cloud sync requires a signed build. Unsigned local builds must pass
+`OVERLAP_CLOUD_SYNC_ENABLED=NO`.
 
-Prerequisites: Node.js 20+ and a Cloudflare account with Workers access.
+### Deploy your own Worker
 
 ```bash
 cd worker
@@ -39,43 +126,85 @@ npx wrangler d1 migrations apply overlap-recipes --remote
 npm run deploy
 ```
 
-After creating a D1 database, replace `database_id` in `worker/wrangler.jsonc` with the ID Wrangler prints. To preload this repository's original recipes into D1, run `npm run seed:sql`, then execute the generated `/private/tmp/overlap-recipes-seed.sql` with `wrangler d1 execute <your-database-name> --remote --file=...`. New recipes are then added automatically on global cache misses.
+Replace `database_id` in `worker/wrangler.jsonc` with the ID that
+`d1 create` prints.
 
-The Worker exposes:
+To preload this repository's seed recipes, run `npm run seed:sql` and execute the
+generated file:
 
-- `GET /health`
-- `POST /v1/combine` with JSON such as `{ "left": "Water", "right": "Fire", "context": "Minecraft" }`; omitted context means `none`.
+```bash
+npx wrangler d1 execute overlap-recipes --remote --file=/private/tmp/overlap-recipes-seed.sql
+```
 
-Keep `OPENAI_API_KEY` solely in Cloudflare’s encrypted Worker secrets. Do not add it to an Xcode build setting, source file, `.env` committed to Git, or app bundle.
+After that, new recipes are added automatically on cache misses.
+
+The Worker exposes two routes:
+
+| Route | Purpose |
+| --- | --- |
+| `GET /health` | Liveness check |
+| `POST /v1/combine` | `{ "left": "Water", "right": "Fire", "context": "Minecraft" }` — an omitted context means `none` |
+
+Other useful scripts: `npm test` (service tests), `npm run check` (type check),
+and `npm run deploy:dry-run`.
+
+Before exposing a Worker publicly, add a Cloudflare rate-limit rule for
+`POST /v1/combine`. OpenAI project limits cap spend, but rate limiting is what
+protects the endpoint itself.
 
 ### Point the app at your Worker
 
-The public repository intentionally has no configured fallback endpoint. To enable one locally, copy the example configuration, replace its value with your Worker URL, and regenerate the project:
+This repository ships with **no configured endpoint**, so a fresh clone cannot
+call anyone else's service. To enable one locally:
 
 ```bash
 cp Config/ServiceEndpoint.local.xcconfig.example Config/ServiceEndpoint.local.xcconfig
-# Edit Config/ServiceEndpoint.local.xcconfig with your Worker URL.
+# Edit the copy, then:
 xcodegen generate
 ```
 
-`Config/ServiceEndpoint.local.xcconfig` is ignored by Git. Its `COMBO_FALLBACK_ENDPOINT` value becomes the app’s `ComboFallbackEndpoint` Info.plist value for every platform target. It must be an HTTPS URL ending in the Worker route. In an `.xcconfig` value, write an HTTPS URL as `https:/$()/your-worker.your-account.workers.dev/v1/combine` because `//` starts a comment. Without that local file—or with an empty or invalid value—the app cannot resolve new combinations.
+`Config/ServiceEndpoint.local.xcconfig` is ignored by Git. Its
+`COMBO_FALLBACK_ENDPOINT` becomes the `ComboFallbackEndpoint` Info.plist value on
+every target, and must be an HTTPS URL ending in the Worker route.
 
-## Privacy and network behavior
+> In an `.xcconfig` value, `//` starts a comment. Write the URL as
+> `https:/$()/your-worker.your-account.workers.dev/v1/combine`.
 
-The app retains discovered recipes and history locally and syncs runs through the player's private iCloud database. Combination requests contain the two element names and context; no iCloud account data or personal discovery history is sent to the Worker. The Worker checks D1 first, so an OpenAI request is made only for an unseen pair and context.
+Without that file — or with an empty or invalid value — the app cannot resolve
+new combinations.
 
-## Development notes
+## Keys and privacy
 
-The current functional roadmap and build/sync/deployment instructions are in [roadmap/ROADMAP.md](roadmap/ROADMAP.md) and [roadmap/IMPLEMENTATION.md](roadmap/IMPLEMENTATION.md). New runs support explicit contexts, including franchise names, and retain discovery history. The Mac build script now signs the app for private CloudKit sync; unsigned test builds must pass `OVERLAP_CLOUD_SYNC_ENABLED=NO`.
+**The Worker owns the OpenAI credential.** Keep `OPENAI_API_KEY` solely in
+Cloudflare's encrypted Worker secrets. It does not belong in an Xcode build
+setting, a source file, a committed `.env`, or the app bundle. The app has never
+held it and has no way to use it.
 
-`project.yml` is the source of truth for the Xcode project. After adding or moving Swift files, run:
+What leaves the device, and what does not:
 
-```bash
-xcodegen generate
-```
+- A combination request carries **only the two element names and the context**.
+- Discovered recipes and history are kept on device, and runs sync through the
+  **player's own private CloudKit database** — not through this project's
+  infrastructure.
+- No account data or discovery history is ever sent to the Worker.
+- Because the Worker checks D1 first, an OpenAI request happens only for a pair
+  and context nobody has tried yet.
 
-Before deploying a public Worker, configure a Cloudflare rate-limit rule for `POST /v1/combine`. OpenAI project limits control spend, but rate limiting protects the public endpoint from unnecessary traffic.
+## Repository layout
+
+| Path | Contents |
+| --- | --- |
+| `Overlap/Shared/` | Game model, views, and design tokens shared by every platform |
+| `Overlap/iOS`, `macOS`, `tvOS` | Per-platform app entry points |
+| `Overlap/Resources/` | Asset catalogs |
+| `Config/` | Info.plists, entitlements, and the service endpoint xcconfig |
+| `worker/` | Cloudflare Worker, D1 migrations, seed and control scripts, tests |
+| `Tests/` | Client and model unit tests |
+| `combos.json` | The seed recipe corpus, loaded into D1 by the seed script. Not bundled into the app |
+| `craft_state.py` | The generator that built the seed corpus |
+| `docs/`, `roadmap/` | Technical write-ups and the functional roadmap |
+| `script/` | Build and run helper |
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+Released under the [MIT License](LICENSE).
