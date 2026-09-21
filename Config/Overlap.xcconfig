@@ -1,0 +1,17 @@
+// Project-wide build configuration.
+//
+// Both values below are intentionally empty in this repository, so a fork can
+// be cloned and built without inheriting anyone else's Apple Developer account
+// or recipe service. Supply your own in Config/Overlap.local.xcconfig, which
+// Git ignores — see Config/Overlap.local.xcconfig.example.
+
+// Your Apple Developer Team ID. Required to sign the app, and therefore
+// required for iCloud sync. Leave empty to build unsigned, and pass
+// OVERLAP_CLOUD_SYNC_ENABLED=NO when you do.
+DEVELOPMENT_TEAM =
+
+// HTTPS URL of your deployed Cloudflare Worker, ending in the route. Without
+// it the app cannot resolve new combinations.
+COMBO_FALLBACK_ENDPOINT =
+
+#include? "Overlap.local.xcconfig"

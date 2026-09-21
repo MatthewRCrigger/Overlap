@@ -1,0 +1,19 @@
+// Copy this file to Config/Overlap.local.xcconfig and fill in your own values:
+//
+//   cp Config/Overlap.local.xcconfig.example Config/Overlap.local.xcconfig
+//
+// That copy is ignored by Git and is never committed. It holds local developer
+// configuration only — never put an OpenAI API key here. The key belongs in
+// Cloudflare's encrypted Worker secrets and nowhere else.
+//
+// Re-run `xcodegen generate` after editing.
+
+// Apple Developer Team ID, for example A1B2C3D4E5. Find it at
+// developer.apple.com under Membership. Leave this empty to build unsigned,
+// and pass OVERLAP_CLOUD_SYNC_ENABLED=NO when you build.
+DEVELOPMENT_TEAM =
+
+// Your deployed Worker, ending in /v1/combine.
+// Write https:/$()/ rather than https:// because xcconfig treats // as a
+// comment and would silently truncate the value.
+COMBO_FALLBACK_ENDPOINT = https:/$()/your-worker.your-account.workers.dev/v1/combine

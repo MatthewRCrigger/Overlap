@@ -13,7 +13,7 @@ xcuserdata/
 .env
 .env.*
 !.env.example
-Config/ServiceEndpoint.local.xcconfig
+Config/*.local.xcconfig
 
 # Python tooling output
 __pycache__/

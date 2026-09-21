@@ -95,8 +95,38 @@ the first build, and again after adding or moving any Swift file:
 xcodegen generate
 ```
 
-`project.yml` also carries a `DEVELOPMENT_TEAM` value. Replace it with your own
-Apple Developer Team ID before building a signed app.
+### Local configuration
+
+Nothing account-specific is committed to this repository — no Apple Developer
+Team ID and no service endpoint. A fork therefore builds without inheriting
+anyone else's account, and cannot call anyone else's Worker.
+
+Both values live in one Git-ignored file. Create it from the template:
+
+```bash
+cp Config/Overlap.local.xcconfig.example Config/Overlap.local.xcconfig
+```
+
+| Setting | What to put there |
+| --- | --- |
+| `DEVELOPMENT_TEAM` | Your Apple Developer Team ID, from developer.apple.com under Membership. Required to sign the app, and therefore required for iCloud sync |
+| `COMBO_FALLBACK_ENDPOINT` | The HTTPS URL of your deployed Worker, ending in `/v1/combine`. Fill this in after [deploying one](#deploy-your-own-worker) |
+
+Then regenerate the project:
+
+```bash
+xcodegen generate
+```
+
+> In an `.xcconfig` value, `//` starts a comment, which would silently truncate
+> a URL. Write it as
+> `https:/$()/your-worker.your-account.workers.dev/v1/combine`.
+
+`Config/Overlap.xcconfig` declares both settings as empty and pulls in your
+local file with `#include?`, so the project still generates and builds when the
+override is absent. Without an endpoint the app runs but cannot resolve new
+combinations; without a team ID you can only build unsigned, which means passing
+`OVERLAP_CLOUD_SYNC_ENABLED=NO`.
 
 ### Run the Mac app
 
@@ -152,26 +182,9 @@ Before exposing a Worker publicly, add a Cloudflare rate-limit rule for
 `POST /v1/combine`. OpenAI project limits cap spend, but rate limiting is what
 protects the endpoint itself.
 
-### Point the app at your Worker
-
-This repository ships with **no configured endpoint**, so a fresh clone cannot
-call anyone else's service. To enable one locally:
-
-```bash
-cp Config/ServiceEndpoint.local.xcconfig.example Config/ServiceEndpoint.local.xcconfig
-# Edit the copy, then:
-xcodegen generate
-```
-
-`Config/ServiceEndpoint.local.xcconfig` is ignored by Git. Its
-`COMBO_FALLBACK_ENDPOINT` becomes the `ComboFallbackEndpoint` Info.plist value on
-every target, and must be an HTTPS URL ending in the Worker route.
-
-> In an `.xcconfig` value, `//` starts a comment. Write the URL as
-> `https:/$()/your-worker.your-account.workers.dev/v1/combine`.
-
-Without that file — or with an empty or invalid value — the app cannot resolve
-new combinations.
+Once it is deployed, put the Worker's URL in `COMBO_FALLBACK_ENDPOINT` in
+`Config/Overlap.local.xcconfig` and run `xcodegen generate` again. That value
+becomes the `ComboFallbackEndpoint` Info.plist entry on every target.
 
 ## Keys and privacy
 
@@ -197,7 +210,7 @@ What leaves the device, and what does not:
 | `Overlap/Shared/` | Game model, views, and design tokens shared by every platform |
 | `Overlap/iOS`, `macOS`, `tvOS` | Per-platform app entry points |
 | `Overlap/Resources/` | Asset catalogs |
-| `Config/` | Info.plists, entitlements, and the service endpoint xcconfig |
+| `Config/` | Info.plists, entitlements, and the build configuration xcconfig |
 | `worker/` | Cloudflare Worker, D1 migrations, seed and control scripts, tests |
 | `Tests/` | Client and model unit tests |
 | `combos.json` | The seed recipe corpus, loaded into D1 by the seed script. Not bundled into the app |

@@ -1,4 +1,0 @@
-// Copy this file to ServiceEndpoint.local.xcconfig and replace the value.
-// Use https:/$()/ instead of https:// because xcconfig treats // as a comment.
-// This is public configuration only; never put an OpenAI API key in this file.
-COMBO_FALLBACK_ENDPOINT = https:/$()/your-worker.your-account.workers.dev/v1/combine
