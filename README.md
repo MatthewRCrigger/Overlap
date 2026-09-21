@@ -84,9 +84,11 @@ deployment notes.
 
 ### Prerequisites
 
-- Xcode with the macOS 26, iOS 26, and tvOS 26 SDKs
+- Xcode 26 or newer — the deployment targets are iOS, macOS, and tvOS 26
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen) — `brew install xcodegen`
-- Node.js 20+ and a Cloudflare account, to run your own Worker
+- Node.js 24+ and a Cloudflare account, to run your own Worker. The service
+  tests import `src/index.ts` directly and use `node:sqlite`, neither of which
+  works unflagged on older releases
 
 `project.yml` is the source of truth for the Xcode project. Generate it before
 the first build, and again after adding or moving any Swift file:
@@ -175,8 +177,22 @@ The Worker exposes two routes:
 | `GET /health` | Liveness check |
 | `POST /v1/combine` | `{ "left": "Water", "right": "Fire", "context": "Minecraft" }` — an omitted context means `none` |
 
-Other useful scripts: `npm test` (service tests), `npm run check` (type check),
-and `npm run deploy:dry-run`.
+Other useful scripts: `npm run check` (type check) and `npm run deploy:dry-run`.
+
+### Tests
+
+```bash
+xcodebuild -scheme Overlap-macOS -destination 'platform=macOS' test
+cd worker && npm test
+```
+
+Eight client and model tests, and eight service tests covering context
+normalization, canonical element identity, legacy row migration, caching, and
+the rate and budget limits.
+
+The Swift tests are hosted by the Mac app, so they need a signing team like any
+other build. `Overlap-macOS` is a shared scheme with the test action already
+wired up, so this works from a fresh clone.
 
 Before exposing a Worker publicly, add a Cloudflare rate-limit rule for
 `POST /v1/combine`. OpenAI project limits cap spend, but rate limiting is what

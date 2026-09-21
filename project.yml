@@ -77,6 +77,11 @@ targets:
     type: application
     platform: macOS
     deploymentTarget: "26.0"
+    # Shared scheme so `xcodebuild -scheme Overlap-macOS test` works from a
+    # fresh clone; the implicit scheme Xcode autocreates has no test action.
+    scheme:
+      testTargets:
+        - OverlapTests
     configFiles:
       Debug: Config/Overlap.xcconfig
       Release: Config/Overlap.xcconfig
