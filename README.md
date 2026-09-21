@@ -33,20 +33,20 @@ The app knows the four starting elements and nothing else. Every combination is
 resolved through a shared recipe service, so a recipe correction reaches every
 player without shipping a build.
 
-```mermaid
-flowchart LR
-  App["Overlap<br/>iPhone · iPad · Mac · Apple TV"]
-  Worker["Cloudflare Worker"]
-  D1[("D1 recipe cache")]
-  AI["OpenAI"]
-  CK[("Player's private<br/>CloudKit database")]
-
-  App -->|"POST /v1/combine"| Worker
-  Worker <-->|"look up pair + context"| D1
-  Worker -.->|"only on a cache miss"| AI
-  AI -.->|"new recipe, written back"| Worker
-  App <-->|"runs and discovery history"| CK
+```text
+Overlap  ·  iPhone · iPad · Mac · Apple TV
+   │
+   │  POST /v1/combine   { left, right, context }
+   ▼
+Cloudflare Worker
+   │
+   ├──▶  D1 recipe cache  ──  hit  ──▶  return the stored recipe
+   │
+   └──▶  miss  ──▶  OpenAI  ──▶  store in D1  ──▶  return the new recipe
 ```
+
+Runs and discovery history never pass through the Worker. They sync separately,
+through the player's own private CloudKit database.
 
 Three rules shape the data model:
 
